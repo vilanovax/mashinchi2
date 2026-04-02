@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Cars ───────────────────────────────────────────
+
+model Car {
+  id          String   @id @default(cuid())
+  nameEn      String
+  nameFa      String
+  brand       String
+  brandFa     String
+  category    String   // sedan, suv, hatchback, crossover, pickup
+  year        Int      // model year range start
+  priceMin    BigInt   // min price in Toman
+  priceMax    BigInt   // max price in Toman
+  imageUrl    String?
+  isNew       Boolean  @default(true) // new (zero-km) or used
+  origin      String   // iranian, chinese, korean, japanese, european
+  description String?  // short Persian description
+
+  scores      CarScores?
+  specs       CarSpecs?
+  tags        CarTag[]
+  interactions UserInteraction[]
+  reviews     CarReview[]
+  prices      PriceHistory[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CarScores {
+  id              String @id @default(cuid())
+  carId           String @unique
+  car             Car    @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  comfort         Int    @default(5) // 1-10
+  performance     Int    @default(5)
+  economy         Int    @default(5) // fuel + maintenance cost
+  safety          Int    @default(5)
+  prestige        Int    @default(5)
+  reliability     Int    @default(5)
+  resaleValue     Int    @default(5) // liquidity
+  familyFriendly  Int    @default(5)
+  sportiness      Int    @default(5)
+  offroad         Int    @default(5)
+  cityDriving     Int    @default(5)
+  longTrip        Int    @default(5)
+  maintenanceRisk Int    @default(5) // higher = more risk
+  afterSales      Int    @default(5) // dealer/service quality
+}
+
+model CarSpecs {
+  id            String  @id @default(cuid())
+  carId         String  @unique
+  car           Car     @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  engine        String? // e.g. "1.5L Turbo"
+  horsepower    Int?
+  torque        Int?
+  transmission  String? // manual, automatic, CVT
+  fuelType      String? // gasoline, diesel, hybrid, electric
+  fuelConsumption Float? // liters per 100km
+  acceleration  Float?  // 0-100 km/h seconds
+  trunkVolume   Int?    // liters
+  groundClearance Int?  // mm
+  length        Int?    // mm
+  width         Int?    // mm
+  weight        Int?    // kg
+  seatingCapacity Int   @default(5)
+}
+
+model CarTag {
+  id    String @id @default(cuid())
+  carId String
+  car   Car    @relation(fields: [carId], references: [id], onDelete: Cascade)
+  tag   String // e.g. "خانوادگی", "اسپرت", "کم‌مصرف", "بادوام"
+
+  @@unique([carId, tag])
+}
+
+model CarReview {
+  id        String   @id @default(cuid())
+  carId     String
+  car       Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+  source    String   // "bama", "blog", "user", "expert"
+  summary   String   // AI-generated summary
+  pros      String[] // list of pros
+  cons      String[] // list of cons
+  warnings  String[] // important warnings
+  rating    Float?   // 1-5
+  createdAt DateTime @default(now())
+}
+
+model PriceHistory {
+  id        String   @id @default(cuid())
+  carId     String
+  car       Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+  price     BigInt   // price in Toman
+  date      DateTime
+  source    String   // "bama", "divar", "manual"
+  createdAt DateTime @default(now())
+
+  @@index([carId, date])
+}
+
+// ─── Users & Taste ──────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  sessionId    String   @unique // cookie-based session
+  budget       BigInt?  // user's budget in Toman
+  interactions UserInteraction[]
+  tasteProfile UserTasteProfile?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model UserInteraction {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  carId     String
+  car       Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+  action    String   // "like", "skip", "compare", "detail_view"
+  round     Int      @default(1) // which round of recommendations
+  createdAt DateTime @default(now())
+
+  @@index([userId, action])
+}
+
+model UserTasteProfile {
+  id              String @id @default(cuid())
+  userId          String @unique
+  user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Taste vector (calculated from interactions)
+  comfort         Float  @default(0)
+  performance     Float  @default(0)
+  economy         Float  @default(0)
+  safety          Float  @default(0)
+  prestige        Float  @default(0)
+  reliability     Float  @default(0)
+  resaleValue     Float  @default(0)
+  familyFriendly  Float  @default(0)
+  sportiness      Float  @default(0)
+  offroad         Float  @default(0)
+  cityDriving     Float  @default(0)
+  longTrip        Float  @default(0)
+
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── Admin / Crawler ────────────────────────────────
+
+model CrawlerConfig {
+  id          String   @id @default(cuid())
+  name        String   // e.g. "bama_prices", "divar_listings"
+  url         String
+  type        String   // "price", "review", "listing"
+  schedule    String?  // cron expression
+  isActive    Boolean  @default(true)
+  lastRunAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
