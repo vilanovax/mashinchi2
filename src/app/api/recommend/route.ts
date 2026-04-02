@@ -39,6 +39,7 @@ export async function GET() {
       scores: true,
       specs: true,
       tags: true,
+      reviews: true,
     },
   });
 
@@ -60,10 +61,29 @@ export async function GET() {
       }
     }
 
+    // Factor in user reviews: average rating bonus/penalty
+    if (car.reviews.length > 0) {
+      const avgRating = car.reviews.reduce((sum, r) => sum + (r.rating || 3), 0) / car.reviews.length;
+      // Boost/penalize based on user satisfaction (3 is neutral)
+      matchScore += (avgRating - 3) * 2;
+      // Penalize cars with many warnings
+      const totalWarnings = car.reviews.reduce((sum, r) => sum + r.warnings.length, 0);
+      matchScore -= totalWarnings * 0.3;
+    }
+
     return {
       ...car,
       priceMin: car.priceMin.toString(),
       priceMax: car.priceMax.toString(),
+      tags: car.tags.map((t) => t.tag),
+      reviews: car.reviews.map((r) => ({
+        source: r.source,
+        summary: r.summary,
+        pros: r.pros,
+        cons: r.cons,
+        warnings: r.warnings,
+        rating: r.rating,
+      })),
       matchScore: Math.round(matchScore * 100) / 100,
     };
   });

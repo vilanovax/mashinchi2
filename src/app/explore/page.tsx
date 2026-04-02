@@ -15,7 +15,7 @@ interface Car {
   priceMax: string;
   origin: string;
   description: string;
-  tags: { id: string; tag: string }[];
+  tags: string[];
   scores: {
     comfort: number;
     performance: number;
@@ -36,6 +36,14 @@ interface Car {
     fuelType: string | null;
     fuelConsumption: number | null;
   } | null;
+  reviews: {
+    source: string;
+    summary: string;
+    pros: string[];
+    cons: string[];
+    warnings: string[];
+    rating: number | null;
+  }[];
 }
 
 const ROUND_SIZE = 6;
@@ -285,28 +293,79 @@ function ExploreContent() {
                   {trait}
                 </span>
               ))}
-              {currentCar.tags.slice(0, 2).map((t) => (
+              {currentCar.tags.slice(0, 2).map((tag) => (
                 <span
-                  key={t.id}
+                  key={tag}
                   className="text-xs bg-background text-muted px-3 py-1 rounded-full"
                 >
-                  {t.tag}
+                  {tag}
                 </span>
               ))}
             </div>
 
-            {/* Description (toggle) */}
-            {showDetail && currentCar.description && (
-              <p className="text-sm text-muted mb-4 leading-7">
-                {currentCar.description}
-              </p>
+            {/* Description + Reviews (toggle) */}
+            {showDetail && (
+              <div className="mb-4 space-y-3">
+                {currentCar.description && (
+                  <p className="text-sm text-muted leading-7">
+                    {currentCar.description}
+                  </p>
+                )}
+
+                {/* User Experience Section */}
+                {currentCar.reviews.length > 0 && (() => {
+                  const allPros = [...new Set(currentCar.reviews.flatMap((r) => r.pros))].slice(0, 3);
+                  const allCons = [...new Set(currentCar.reviews.flatMap((r) => r.cons))].slice(0, 3);
+                  const allWarnings = [...new Set(currentCar.reviews.flatMap((r) => r.warnings))].slice(0, 2);
+                  const avgRating = currentCar.reviews.reduce((s, r) => s + (r.rating || 3), 0) / currentCar.reviews.length;
+
+                  return (
+                    <div className="bg-background rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold">تجربه کاربران</span>
+                        <span className="text-xs font-bold text-primary">{toPersianDigits(avgRating.toFixed(1))} از ۵</span>
+                      </div>
+                      {allPros.length > 0 && (
+                        <div className="space-y-1">
+                          {allPros.map((p, i) => (
+                            <div key={i} className="flex items-start gap-1.5 text-xs text-accent">
+                              <span className="shrink-0 mt-0.5">+</span>
+                              <span>{p}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {allCons.length > 0 && (
+                        <div className="space-y-1">
+                          {allCons.map((c, i) => (
+                            <div key={i} className="flex items-start gap-1.5 text-xs text-danger">
+                              <span className="shrink-0 mt-0.5">−</span>
+                              <span>{c}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {allWarnings.length > 0 && (
+                        <div className="space-y-1 pt-1 border-t border-border">
+                          {allWarnings.map((w, i) => (
+                            <div key={i} className="flex items-start gap-1.5 text-xs text-yellow-600 dark:text-yellow-400">
+                              <span className="shrink-0 mt-0.5">⚠</span>
+                              <span>{w}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
             )}
 
             <button
               onClick={() => setShowDetail(!showDetail)}
               className="text-xs text-primary mb-2"
             >
-              {showDetail ? "بستن" : "جزئیات بیشتر"}
+              {showDetail ? "بستن" : "جزئیات و تجربه کاربران"}
             </button>
           </div>
         </div>

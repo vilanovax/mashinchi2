@@ -4,6 +4,15 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { formatPrice, toPersianDigits, getOriginLabel, getCategoryLabel } from "@/lib/utils";
 
+interface Review {
+  source: string;
+  summary: string;
+  pros: string[];
+  cons: string[];
+  warnings: string[];
+  rating: number | null;
+}
+
 interface Recommendation {
   nameFa: string;
   nameEn: string;
@@ -16,6 +25,7 @@ interface Recommendation {
   tags: string[];
   scores: Record<string, number>;
   specs: { engine?: string | null; horsepower?: number | null; transmission?: string | null; fuelConsumption?: number | null } | null;
+  reviews: Review[];
   matchScore: number;
 }
 
@@ -248,6 +258,75 @@ export default function ResultsPage() {
                       )}
                     </div>
                   )}
+
+                  {/* User Experience */}
+                  {car.reviews && car.reviews.length > 0 && (() => {
+                    const allPros = [...new Set(car.reviews.flatMap((r: Review) => r.pros))].slice(0, 4);
+                    const allCons = [...new Set(car.reviews.flatMap((r: Review) => r.cons))].slice(0, 4);
+                    const allWarnings = [...new Set(car.reviews.flatMap((r: Review) => r.warnings))];
+                    const avgRating = car.reviews.reduce((s: number, r: Review) => s + (r.rating || 3), 0) / car.reviews.length;
+
+                    return (
+                      <div className="mt-4 bg-background rounded-xl p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold">تجربه کاربران</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-muted">امتیاز:</span>
+                            <span className="text-sm font-black text-primary">{toPersianDigits(avgRating.toFixed(1))}</span>
+                            <span className="text-xs text-muted">از ۵</span>
+                          </div>
+                        </div>
+
+                        {/* Pros */}
+                        {allPros.length > 0 && (
+                          <div className="space-y-1.5">
+                            <span className="text-xs font-bold text-accent">نقاط قوت</span>
+                            {allPros.map((p: string, i: number) => (
+                              <div key={i} className="flex items-start gap-2 text-xs">
+                                <span className="text-accent shrink-0 mt-0.5">+</span>
+                                <span>{p}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Cons */}
+                        {allCons.length > 0 && (
+                          <div className="space-y-1.5">
+                            <span className="text-xs font-bold text-danger">نقاط ضعف</span>
+                            {allCons.map((c: string, i: number) => (
+                              <div key={i} className="flex items-start gap-2 text-xs">
+                                <span className="text-danger shrink-0 mt-0.5">−</span>
+                                <span>{c}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Warnings */}
+                        {allWarnings.length > 0 && (
+                          <div className="space-y-1.5 pt-2 border-t border-border">
+                            <span className="text-xs font-bold text-yellow-600 dark:text-yellow-400">هشدارها</span>
+                            {allWarnings.map((w: string, i: number) => (
+                              <div key={i} className="flex items-start gap-2 text-xs text-yellow-600 dark:text-yellow-400">
+                                <span className="shrink-0 mt-0.5">⚠</span>
+                                <span>{w}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Review Sources */}
+                        <div className="flex gap-2 pt-2 border-t border-border">
+                          {car.reviews.map((r: Review, i: number) => (
+                            <span key={i} className="text-[10px] bg-surface px-2 py-0.5 rounded-full text-muted">
+                              {r.source === "bama" ? "باما" : r.source === "expert" ? "کارشناس" : "کاربر"}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Match Score */}
                   <div className="mt-4 p-3 bg-primary/5 rounded-xl text-center">

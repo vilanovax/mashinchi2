@@ -4,9 +4,9 @@ services:
     container_name: mashinchi-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: mashinchi
+      POSTGRES_DB: mashinchi2
       POSTGRES_USER: mashinchi
-      POSTGRES_PASSWORD: mashinchi123
+      POSTGRES_PASSWORD: mashinchi
     ports:
       - "5434:5432"
     volumes:

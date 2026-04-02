@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
       scores: true,
       specs: true,
       tags: true,
+      reviews: true,
     },
     orderBy: { createdAt: "asc" },
   });
@@ -32,6 +33,15 @@ export async function GET(request: NextRequest) {
     ...car,
     priceMin: car.priceMin.toString(),
     priceMax: car.priceMax.toString(),
+    tags: car.tags.map((t) => t.tag),
+    reviews: car.reviews.map((r) => ({
+      source: r.source,
+      summary: r.summary,
+      pros: r.pros,
+      cons: r.cons,
+      warnings: r.warnings,
+      rating: r.rating,
+    })),
   }));
 
   return NextResponse.json(serialized);
