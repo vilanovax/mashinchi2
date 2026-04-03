@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { formatPrice, toPersianDigits, getOriginLabel, getCategoryLabel } from "@/lib/utils";
+import BottomSheet from "@/components/BottomSheet";
 
 interface Car {
   id: string;
@@ -46,6 +47,27 @@ interface Car {
   }[];
 }
 
+interface CarDetail extends Car {
+  intel: {
+    frequentPros: string[];
+    frequentCons: string[];
+    commonIssues: string[];
+    purchaseWarnings: string[];
+    ownerVerdict: string;
+    overallSummary: string;
+    whyBuy: string;
+    whyNotBuy: string;
+    purchaseRisk: number;
+    ownerSatisfaction: number;
+    suitFamily: number;
+    suitCity: number;
+    suitTravel: number;
+    suitYoung: number;
+    suitInvestment: number;
+  } | null;
+  similarCars: { id: string; nameFa: string; brandFa: string; priceMin: string; priceMax: string }[];
+}
+
 const ROUND_SIZE = 6;
 const MIN_INTERACTIONS = 6;
 
@@ -60,8 +82,10 @@ function ExploreContent() {
   const [totalInteractions, setTotalInteractions] = useState(0);
   const [animClass, setAnimClass] = useState("card-enter");
   const [loading, setLoading] = useState(true);
-  const [showDetail, setShowDetail] = useState(false);
   const [round, setRound] = useState(1);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [carDetail, setCarDetail] = useState<CarDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const fetchCars = useCallback(async () => {
     setLoading(true);
@@ -75,7 +99,6 @@ function ExploreContent() {
     );
     const data = await res.json();
 
-    // Shuffle and take ROUND_SIZE
     const shuffled = data.sort(() => Math.random() - 0.5).slice(0, ROUND_SIZE);
     setCars(shuffled);
     setCurrentIndex(0);
@@ -112,29 +135,46 @@ function ExploreContent() {
       if (currentIndex < cars.length - 1) {
         setCurrentIndex((prev) => prev + 1);
         setAnimClass("card-enter");
+        setSheetOpen(false);
+        setCarDetail(null);
       } else if (newTotal >= MIN_INTERACTIONS) {
-        // Enough interactions, show results
         router.push("/results");
       } else {
-        // Load more cars
         setRound((prev) => prev + 1);
         setAnimClass("card-enter");
+        setSheetOpen(false);
+        setCarDetail(null);
       }
     }, 280);
   };
 
+  const openDetail = async (carId: string) => {
+    setSheetOpen(true);
+    setDetailLoading(true);
+    try {
+      const res = await fetch(`/api/cars/${carId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCarDetail(data);
+      }
+    } catch {
+      // ignore
+    }
+    setDetailLoading(false);
+  };
+
   const getTopTraits = (car: Car): string[] => {
     if (!car.scores) return [];
-    const traits: { key: string; label: string; value: number }[] = [
-      { key: "comfort", label: "راحت", value: car.scores.comfort },
-      { key: "performance", label: "قدرتمند", value: car.scores.performance },
-      { key: "economy", label: "اقتصادی", value: car.scores.economy },
-      { key: "safety", label: "امن", value: car.scores.safety },
-      { key: "prestige", label: "باکلاس", value: car.scores.prestige },
-      { key: "reliability", label: "مطمئن", value: car.scores.reliability },
-      { key: "resaleValue", label: "نقدشونده", value: car.scores.resaleValue },
-      { key: "familyFriendly", label: "خانوادگی", value: car.scores.familyFriendly },
-      { key: "sportiness", label: "اسپرت", value: car.scores.sportiness },
+    const traits: { label: string; value: number }[] = [
+      { label: "راحت", value: car.scores.comfort },
+      { label: "قدرتمند", value: car.scores.performance },
+      { label: "اقتصادی", value: car.scores.economy },
+      { label: "امن", value: car.scores.safety },
+      { label: "باکلاس", value: car.scores.prestige },
+      { label: "مطمئن", value: car.scores.reliability },
+      { label: "نقدشونده", value: car.scores.resaleValue },
+      { label: "خانوادگی", value: car.scores.familyFriendly },
+      { label: "اسپرت", value: car.scores.sportiness },
     ];
     return traits
       .sort((a, b) => b.value - a.value)
@@ -303,69 +343,12 @@ function ExploreContent() {
               ))}
             </div>
 
-            {/* Description + Reviews (toggle) */}
-            {showDetail && (
-              <div className="mb-4 space-y-3">
-                {currentCar.description && (
-                  <p className="text-sm text-muted leading-7">
-                    {currentCar.description}
-                  </p>
-                )}
-
-                {/* User Experience Section */}
-                {currentCar.reviews.length > 0 && (() => {
-                  const allPros = [...new Set(currentCar.reviews.flatMap((r) => r.pros))].slice(0, 3);
-                  const allCons = [...new Set(currentCar.reviews.flatMap((r) => r.cons))].slice(0, 3);
-                  const allWarnings = [...new Set(currentCar.reviews.flatMap((r) => r.warnings))].slice(0, 2);
-                  const avgRating = currentCar.reviews.reduce((s, r) => s + (r.rating || 3), 0) / currentCar.reviews.length;
-
-                  return (
-                    <div className="bg-background rounded-xl p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold">تجربه کاربران</span>
-                        <span className="text-xs font-bold text-primary">{toPersianDigits(avgRating.toFixed(1))} از ۵</span>
-                      </div>
-                      {allPros.length > 0 && (
-                        <div className="space-y-1">
-                          {allPros.map((p, i) => (
-                            <div key={i} className="flex items-start gap-1.5 text-xs text-accent">
-                              <span className="shrink-0 mt-0.5">+</span>
-                              <span>{p}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {allCons.length > 0 && (
-                        <div className="space-y-1">
-                          {allCons.map((c, i) => (
-                            <div key={i} className="flex items-start gap-1.5 text-xs text-danger">
-                              <span className="shrink-0 mt-0.5">−</span>
-                              <span>{c}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {allWarnings.length > 0 && (
-                        <div className="space-y-1 pt-1 border-t border-border">
-                          {allWarnings.map((w, i) => (
-                            <div key={i} className="flex items-start gap-1.5 text-xs text-yellow-600 dark:text-yellow-400">
-                              <span className="shrink-0 mt-0.5">⚠</span>
-                              <span>{w}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-
+            {/* Detail Button */}
             <button
-              onClick={() => setShowDetail(!showDetail)}
-              className="text-xs text-primary mb-2"
+              onClick={() => openDetail(currentCar.id)}
+              className="w-full text-center text-sm text-primary font-bold py-2 bg-primary/5 rounded-xl hover:bg-primary/10 transition-colors"
             >
-              {showDetail ? "بستن" : "جزئیات و تجربه کاربران"}
+              جزئیات و تحلیل هوشمند
             </button>
           </div>
         </div>
@@ -397,6 +380,230 @@ function ExploreContent() {
           </button>
         </div>
       </div>
+
+      {/* Bottom Sheet - Car Detail */}
+      <BottomSheet
+        isOpen={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title={carDetail ? carDetail.nameFa : currentCar.nameFa}
+      >
+        {detailLoading ? (
+          <div className="py-8 text-center">
+            <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-sm text-muted">در حال بارگذاری...</p>
+          </div>
+        ) : carDetail ? (
+          <div className="space-y-5 pb-4">
+            {/* Overview */}
+            {carDetail.intel && (
+              <div className="bg-background rounded-xl p-4">
+                <h4 className="text-sm font-bold mb-2">جمع‌بندی</h4>
+                <p className="text-sm leading-7 text-muted">{carDetail.intel.overallSummary}</p>
+              </div>
+            )}
+
+            {/* Why Buy / Why Not */}
+            {carDetail.intel && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-accent/5 rounded-xl p-3">
+                  <h5 className="text-xs font-bold text-accent mb-1">چرا بخری</h5>
+                  <p className="text-xs leading-6 text-muted">{carDetail.intel.whyBuy}</p>
+                </div>
+                <div className="bg-danger/5 rounded-xl p-3">
+                  <h5 className="text-xs font-bold text-danger mb-1">چرا نخری</h5>
+                  <p className="text-xs leading-6 text-muted">{carDetail.intel.whyNotBuy}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Scores */}
+            {carDetail.scores && (
+              <div>
+                <h4 className="text-sm font-bold mb-3">امتیازات</h4>
+                <div className="space-y-2">
+                  {[
+                    { key: "comfort", label: "راحتی" },
+                    { key: "performance", label: "عملکرد" },
+                    { key: "economy", label: "صرفه اقتصادی" },
+                    { key: "safety", label: "ایمنی" },
+                    { key: "reliability", label: "قابلیت اطمینان" },
+                    { key: "resaleValue", label: "نقدشوندگی" },
+                    { key: "maintenanceRisk", label: "ریسک نگهداری" },
+                  ].map(({ key, label }) => (
+                    <div key={key} className="flex items-center gap-3">
+                      <span className="text-xs text-muted w-24 shrink-0">{label}</span>
+                      <div className="flex-1 h-2 bg-border rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${key === "maintenanceRisk" ? "bg-danger" : "bg-primary"}`}
+                          style={{ width: `${(((carDetail.scores as Record<string, number>)[key] || 5) / 10) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-bold w-6 text-left">
+                        {toPersianDigits((carDetail.scores as Record<string, number>)[key] || 5)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Pros & Cons from intel */}
+            {carDetail.intel && (
+              <div className="space-y-3">
+                {carDetail.intel.frequentPros.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-bold text-accent mb-2">نقاط قوت</h4>
+                    {carDetail.intel.frequentPros.map((p, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs mb-1.5">
+                        <span className="text-accent shrink-0 mt-0.5">+</span>
+                        <span>{p}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {carDetail.intel.frequentCons.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-bold text-danger mb-2">نقاط ضعف</h4>
+                    {carDetail.intel.frequentCons.map((c, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs mb-1.5">
+                        <span className="text-danger shrink-0 mt-0.5">-</span>
+                        <span>{c}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Common Issues */}
+            {carDetail.intel && carDetail.intel.commonIssues.length > 0 && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/10 rounded-xl p-4">
+                <h4 className="text-sm font-bold text-yellow-700 dark:text-yellow-400 mb-2">خرابی‌های رایج</h4>
+                {carDetail.intel.commonIssues.map((issue, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs text-yellow-700 dark:text-yellow-400 mb-1.5">
+                    <span className="shrink-0 mt-0.5">!</span>
+                    <span>{issue}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Purchase Warnings */}
+            {carDetail.intel && carDetail.intel.purchaseWarnings.length > 0 && (
+              <div className="bg-danger/5 rounded-xl p-4">
+                <h4 className="text-sm font-bold text-danger mb-2">هشدارهای خرید</h4>
+                {carDetail.intel.purchaseWarnings.map((w, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs text-danger mb-1.5">
+                    <span className="shrink-0 mt-0.5">!</span>
+                    <span>{w}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Owner Verdict */}
+            {carDetail.intel && (
+              <div className="bg-background rounded-xl p-4">
+                <h4 className="text-sm font-bold mb-2">نظر مالکان</h4>
+                <p className="text-sm leading-7 text-muted">{carDetail.intel.ownerVerdict}</p>
+              </div>
+            )}
+
+            {/* Specs */}
+            {carDetail.specs && (
+              <div>
+                <h4 className="text-sm font-bold mb-2">مشخصات فنی</h4>
+                <div className="flex flex-wrap gap-2">
+                  {carDetail.specs.engine && (
+                    <span className="text-xs bg-background px-3 py-1.5 rounded-lg">
+                      موتور: {carDetail.specs.engine}
+                    </span>
+                  )}
+                  {carDetail.specs.horsepower && (
+                    <span className="text-xs bg-background px-3 py-1.5 rounded-lg">
+                      {toPersianDigits(String(carDetail.specs.horsepower))} اسب بخار
+                    </span>
+                  )}
+                  {carDetail.specs.fuelConsumption && (
+                    <span className="text-xs bg-background px-3 py-1.5 rounded-lg">
+                      مصرف: {toPersianDigits(String(carDetail.specs.fuelConsumption))} لیتر
+                    </span>
+                  )}
+                  {carDetail.specs.transmission && (
+                    <span className="text-xs bg-background px-3 py-1.5 rounded-lg">
+                      {carDetail.specs.transmission === "automatic" ? "اتوماتیک" : carDetail.specs.transmission === "manual" ? "دنده‌ای" : carDetail.specs.transmission}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Similar Cars */}
+            {carDetail.similarCars && carDetail.similarCars.length > 0 && (
+              <div>
+                <h4 className="text-sm font-bold mb-2">ماشین‌های مشابه</h4>
+                <div className="space-y-2">
+                  {carDetail.similarCars.map((sc) => (
+                    <div key={sc.id} className="flex items-center justify-between bg-background rounded-xl px-4 py-3">
+                      <div>
+                        <span className="text-sm font-bold">{sc.nameFa}</span>
+                        <span className="text-xs text-muted mr-2">{sc.brandFa}</span>
+                      </div>
+                      <span className="text-xs text-primary font-bold">
+                        {toPersianDigits(formatPrice(sc.priceMin))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* User Reviews */}
+            {carDetail.reviews && carDetail.reviews.length > 0 && (
+              <div>
+                <h4 className="text-sm font-bold mb-2">نظرات کاربران</h4>
+                <div className="space-y-3">
+                  {carDetail.reviews.slice(0, 3).map((r, i) => (
+                    <div key={i} className="bg-background rounded-xl p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs bg-surface px-2 py-0.5 rounded-full text-muted">
+                          {r.source === "bama" ? "باما" : r.source === "expert" ? "کارشناس" : "کاربر"}
+                        </span>
+                        {r.rating && (
+                          <span className="text-xs font-bold text-primary">
+                            {toPersianDigits(r.rating.toFixed(1))} از ۵
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs leading-6 text-muted mb-2">{r.summary}</p>
+                      {r.pros.length > 0 && (
+                        <div className="space-y-1 mb-1">
+                          {r.pros.slice(0, 2).map((p, j) => (
+                            <div key={j} className="flex items-start gap-1.5 text-xs text-accent">
+                              <span className="shrink-0">+</span>
+                              <span>{p}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {r.cons.length > 0 && (
+                        <div className="space-y-1">
+                          {r.cons.slice(0, 2).map((c, j) => (
+                            <div key={j} className="flex items-start gap-1.5 text-xs text-danger">
+                              <span className="shrink-0">-</span>
+                              <span>{c}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : null}
+      </BottomSheet>
     </div>
   );
 }

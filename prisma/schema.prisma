@@ -27,6 +27,7 @@ model Car {
   scores      CarScores?
   specs       CarSpecs?
   tags        CarTag[]
+  intel       CarIntelligence?
   interactions UserInteraction[]
   reviews     CarReview[]
   prices      PriceHistory[]
@@ -83,6 +84,41 @@ model CarTag {
   tag   String // e.g. "خانوادگی", "اسپرت", "کم‌مصرف", "بادوام"
 
   @@unique([carId, tag])
+}
+
+model CarIntelligence {
+  id                String @id @default(cuid())
+  carId             String @unique
+  car               Car    @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  // Core scores (1-10)
+  acceleration      Int    @default(5)
+  depreciation      Int    @default(5) // wear & tear rate
+  repairCost        Int    @default(5) // 10 = very expensive
+  secondHandMarket  Int    @default(5) // liquidity in used market
+  priceDropRate     Int    @default(5) // how fast it loses value
+  buildQuality      Int    @default(5)
+  afterSalesService Int    @default(5)
+  ownerSatisfaction Int    @default(5)
+  purchaseRisk      Int    @default(5) // 10 = very risky
+  fuelEconomy       Int    @default(5)
+
+  // Suitability scores (1-10)
+  suitFamily        Int    @default(5)
+  suitCity          Int    @default(5)
+  suitTravel        Int    @default(5)
+  suitYoung         Int    @default(5)
+  suitInvestment    Int    @default(5)
+
+  // Rich text data (Farsi)
+  frequentPros      String[]  // نقاط قوت پرتکرار
+  frequentCons      String[]  // نقاط ضعف پرتکرار
+  commonIssues      String[]  // خرابی‌های رایج
+  purchaseWarnings  String[]  // هشدارهای خرید
+  ownerVerdict      String    // توصیف رایج مالکان
+  overallSummary    String    // جمع‌بندی هوشمند
+  whyBuy            String    // چرا بخری
+  whyNotBuy         String    // چرا نخری
 }
 
 model CarReview {
@@ -153,6 +189,18 @@ model UserTasteProfile {
   offroad         Float  @default(0)
   cityDriving     Float  @default(0)
   longTrip        Float  @default(0)
+
+  // User type scores (derived from interactions)
+  typeEconomic    Float  @default(0) // اقتصادی
+  typeFamily      Float  @default(0) // خانوادگی
+  typeSport       Float  @default(0) // اسپرت
+  typePrestige    Float  @default(0) // پرستیژمحور
+  typeSafe        Float  @default(0) // کم‌ریسک
+  typeSpecial     Float  @default(0) // خاص‌پسند
+  typeOffroad     Float  @default(0) // آفرود
+  typeCity        Float  @default(0) // شهری
+  typeTravel      Float  @default(0) // سفرمحور
+  typeInvestment  Float  @default(0) // سرمایه‌ای
 
   updatedAt       DateTime @updatedAt
 }

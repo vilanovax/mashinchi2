@@ -128,3 +128,26 @@ input[type="range"]::-moz-range-thumb {
     transform: translateY(0);
   }
 }
+
+/* Bottom Sheet */
+.bottom-sheet-backdrop {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.bottom-sheet-enter {
+  animation: slideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.bottom-sheet-exit {
+  animation: slideDown 0.2s ease-in forwards;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
