@@ -21,14 +21,12 @@
   --border-color: #e2e8f0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0f172a;
-    --foreground: #e2e8f0;
-    --surface: #1e293b;
-    --muted: #64748b;
-    --border-color: #334155;
-  }
+.dark {
+  --background: #0f172a;
+  --foreground: #e2e8f0;
+  --surface: #1e293b;
+  --muted: #64748b;
+  --border-color: #334155;
 }
 
 * {
@@ -128,6 +126,10 @@ input[type="range"]::-moz-range-thumb {
     transform: translateY(0);
   }
 }
+
+/* Hide scrollbar */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 /* Bottom Sheet */
 .bottom-sheet-backdrop {

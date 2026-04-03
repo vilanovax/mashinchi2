@@ -96,8 +96,29 @@ export default function ResultsPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedCar, setSelectedCar] = useState<CarDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+
+  const toggleFavorite = async (carId: string) => {
+    const res = await fetch("/api/favorites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ carId }),
+    });
+    const data = await res.json();
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      if (data.favorited) next.add(carId); else next.delete(carId);
+      return next;
+    });
+  };
 
   useEffect(() => {
+    // Load favorites
+    fetch("/api/favorites")
+      .then((r) => r.json())
+      .then((d) => { if (d.favorites) setFavoriteIds(new Set(d.favorites.map((f: { id: string }) => f.id))); })
+      .catch(() => {});
+
     fetch("/api/recommend")
       .then((res) => res.json())
       .then((data) => {
@@ -384,8 +405,9 @@ export default function ResultsPage() {
             <p className="text-sm text-muted">در حال بارگذاری...</p>
           </div>
         ) : selectedCar ? (
-          <div className="space-y-5 pb-4">
-            {/* Header */}
+          <div className="space-y-4 pb-4">
+
+            {/* Header: Price + Tags + Favorite */}
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted">{selectedCar.brandFa} | {getOriginLabel(selectedCar.origin)} | {getCategoryLabel(selectedCar.category)}</p>
@@ -395,41 +417,73 @@ export default function ResultsPage() {
                   <span className="text-sm font-bold text-primary">{toPersianDigits(formatPrice(selectedCar.priceMax))}</span>
                 </div>
               </div>
-              {selectedCar.tags && (
-                <div className="flex flex-wrap gap-1">
-                  {selectedCar.tags.slice(0, 3).map((tag) => (
-                    <span key={tag} className="text-[10px] bg-background text-muted px-2 py-0.5 rounded-full">{tag}</span>
-                  ))}
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                {selectedCar.tags && selectedCar.tags.slice(0, 2).map((tag) => (
+                  <span key={tag} className="text-[10px] bg-background text-muted px-2 py-0.5 rounded-full">{tag}</span>
+                ))}
+                <button
+                  onClick={() => toggleFavorite(selectedCar.id)}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+                    favoriteIds.has(selectedCar.id) ? "bg-danger/10" : "bg-background"
+                  }`}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24"
+                    fill={favoriteIds.has(selectedCar.id) ? "currentColor" : "none"}
+                    stroke="currentColor" strokeWidth="2"
+                    className={favoriteIds.has(selectedCar.id) ? "text-danger" : "text-muted"}
+                  >
+                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7z" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
-            {/* Overview Summary */}
+            {/* Hero: Quick Stats Row */}
             {selectedCar.intel && (
-              <div className="bg-background rounded-xl p-4">
-                <h4 className="text-sm font-bold mb-2">جمع‌بندی</h4>
-                <p className="text-sm leading-7 text-muted">{selectedCar.intel.overallSummary}</p>
+              <div className="flex gap-2">
+                <div className="flex-1 bg-accent/8 rounded-xl p-3 text-center">
+                  <div className="text-lg font-black text-accent">{toPersianDigits(selectedCar.intel.ownerSatisfaction)}<span className="text-xs font-normal text-muted">/۱۰</span></div>
+                  <div className="text-[10px] text-muted mt-0.5">رضایت مالکان</div>
+                </div>
+                <div className="flex-1 bg-primary/8 rounded-xl p-3 text-center">
+                  <div className="text-lg font-black text-primary">{toPersianDigits(10 - selectedCar.intel.purchaseRisk)}<span className="text-xs font-normal text-muted">/۱۰</span></div>
+                  <div className="text-[10px] text-muted mt-0.5">امنیت خرید</div>
+                </div>
+                {selectedCar.reviews.length > 0 && (
+                  <div className="flex-1 bg-yellow-500/8 rounded-xl p-3 text-center">
+                    <div className="text-lg font-black text-yellow-600 dark:text-yellow-400">
+                      {toPersianDigits((selectedCar.reviews.reduce((s, r) => s + (r.rating || 3), 0) / selectedCar.reviews.length).toFixed(1))}
+                      <span className="text-xs font-normal text-muted">/۵</span>
+                    </div>
+                    <div className="text-[10px] text-muted mt-0.5">امتیاز کاربران</div>
+                  </div>
+                )}
               </div>
+            )}
+
+            {/* Summary */}
+            {selectedCar.intel && (
+              <p className="text-sm leading-7 text-muted">{selectedCar.intel.overallSummary}</p>
             )}
 
             {/* Why Buy / Why Not */}
             {selectedCar.intel && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-accent/5 rounded-xl p-3">
-                  <h5 className="text-xs font-bold text-accent mb-1">چرا بخری</h5>
-                  <p className="text-xs leading-6 text-muted">{selectedCar.intel.whyBuy}</p>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="bg-accent/6 border border-accent/15 rounded-xl p-3">
+                  <h5 className="text-xs font-black text-accent mb-1.5">چرا بخری</h5>
+                  <p className="text-xs leading-6">{selectedCar.intel.whyBuy}</p>
                 </div>
-                <div className="bg-danger/5 rounded-xl p-3">
-                  <h5 className="text-xs font-bold text-danger mb-1">چرا نخری</h5>
-                  <p className="text-xs leading-6 text-muted">{selectedCar.intel.whyNotBuy}</p>
+                <div className="bg-danger/6 border border-danger/15 rounded-xl p-3">
+                  <h5 className="text-xs font-black text-danger mb-1.5">چرا نخری</h5>
+                  <p className="text-xs leading-6">{selectedCar.intel.whyNotBuy}</p>
                 </div>
               </div>
             )}
 
             {/* Suitability Scores */}
             {selectedCar.intel && (
-              <div>
-                <h4 className="text-sm font-bold mb-3">تناسب با نیاز شما</h4>
+              <div className="bg-background rounded-xl p-4">
+                <h4 className="text-xs font-black mb-3">تناسب با نیاز شما</h4>
                 <div className="grid grid-cols-5 gap-2 text-center">
                   {[
                     { key: "suitFamily", label: "خانواده" },
@@ -442,7 +496,7 @@ export default function ResultsPage() {
                     return (
                       <div key={key} className="flex flex-col items-center gap-1">
                         <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-black ${
+                          className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black ${
                             val >= 7 ? "bg-accent/10 text-accent" : val >= 5 ? "bg-primary/10 text-primary" : "bg-danger/10 text-danger"
                           }`}
                         >
@@ -456,208 +510,205 @@ export default function ResultsPage() {
               </div>
             )}
 
-            {/* Score Bars */}
+            {/* Pros & Cons Side by Side */}
+            {selectedCar.intel && (selectedCar.intel.frequentPros.length > 0 || selectedCar.intel.frequentCons.length > 0) && (
+              <div className="bg-background rounded-xl p-4">
+                <div className="grid grid-cols-2 gap-4">
+                  {selectedCar.intel.frequentPros.length > 0 && (
+                    <div>
+                      <h5 className="text-xs font-black text-accent mb-2">نقاط قوت</h5>
+                      <div className="space-y-1.5">
+                        {selectedCar.intel.frequentPros.slice(0, 4).map((p, i) => (
+                          <div key={i} className="flex items-start gap-1.5 text-[11px]">
+                            <span className="text-accent shrink-0 mt-px font-bold">+</span>
+                            <span>{p}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedCar.intel.frequentCons.length > 0 && (
+                    <div>
+                      <h5 className="text-xs font-black text-danger mb-2">نقاط ضعف</h5>
+                      <div className="space-y-1.5">
+                        {selectedCar.intel.frequentCons.slice(0, 4).map((c, i) => (
+                          <div key={i} className="flex items-start gap-1.5 text-[11px]">
+                            <span className="text-danger shrink-0 mt-px font-bold">-</span>
+                            <span>{c}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Scores - compact grid */}
             {selectedCar.scores && (
-              <div>
-                <h4 className="text-sm font-bold mb-3">امتیازات</h4>
-                <div className="space-y-2">
+              <div className="bg-background rounded-xl p-4">
+                <h4 className="text-xs font-black mb-3">امتیازات</h4>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                   {[
                     { key: "comfort", label: "راحتی" },
                     { key: "performance", label: "عملکرد" },
                     { key: "economy", label: "صرفه اقتصادی" },
                     { key: "safety", label: "ایمنی" },
-                    { key: "reliability", label: "قابلیت اطمینان" },
+                    { key: "reliability", label: "اطمینان" },
                     { key: "resaleValue", label: "نقدشوندگی" },
                     { key: "maintenanceRisk", label: "ریسک نگهداری" },
-                  ].map(({ key, label }) => (
-                    <div key={key} className="flex items-center gap-3">
-                      <span className="text-xs text-muted w-24 shrink-0">{label}</span>
-                      <div className="flex-1 h-2 bg-border rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${key === "maintenanceRisk" ? "bg-danger" : "bg-primary"}`}
-                          style={{ width: `${((selectedCar.scores[key] || 5) / 10) * 100}%` }}
-                        />
+                    { key: "afterSales", label: "خدمات پس فروش" },
+                  ].map(({ key, label }) => {
+                    const score = selectedCar.scores[key] || 5;
+                    return (
+                      <div key={key} className="flex items-center gap-2">
+                        <span className="text-[11px] text-muted w-20 shrink-0">{label}</span>
+                        <div className="flex-1 h-1.5 bg-border rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              key === "maintenanceRisk"
+                                ? score >= 7 ? "bg-danger" : score >= 4 ? "bg-yellow-500" : "bg-accent"
+                                : score >= 7 ? "bg-accent" : score >= 4 ? "bg-primary" : "bg-danger"
+                            }`}
+                            style={{ width: `${(score / 10) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-[11px] font-black w-4 text-center">{toPersianDigits(score)}</span>
                       </div>
-                      <span className="text-xs font-bold w-6 text-left">
-                        {toPersianDigits(selectedCar.scores[key] || 5)}
-                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Warnings Section - merged */}
+            {selectedCar.intel && (selectedCar.intel.commonIssues.length > 0 || selectedCar.intel.purchaseWarnings.length > 0) && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800/30 rounded-xl p-4">
+                <h4 className="text-xs font-black text-yellow-700 dark:text-yellow-400 mb-2">هشدارها و خرابی‌های رایج</h4>
+                <div className="space-y-1.5">
+                  {selectedCar.intel.purchaseWarnings.map((w, i) => (
+                    <div key={`w-${i}`} className="flex items-start gap-1.5 text-[11px] text-danger">
+                      <span className="shrink-0 mt-px font-bold">!</span>
+                      <span>{w}</span>
+                    </div>
+                  ))}
+                  {selectedCar.intel.commonIssues.map((issue, i) => (
+                    <div key={`i-${i}`} className="flex items-start gap-1.5 text-[11px] text-yellow-700 dark:text-yellow-400">
+                      <span className="shrink-0 mt-px font-bold">!</span>
+                      <span>{issue}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Pros & Cons from intel */}
-            {selectedCar.intel && (
-              <div className="space-y-3">
-                {selectedCar.intel.frequentPros.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-bold text-accent mb-2">نقاط قوت</h4>
-                    {selectedCar.intel.frequentPros.map((p, i) => (
-                      <div key={i} className="flex items-start gap-2 text-xs mb-1.5">
-                        <span className="text-accent shrink-0 mt-0.5">+</span>
-                        <span>{p}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {selectedCar.intel.frequentCons.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-bold text-danger mb-2">نقاط ضعف</h4>
-                    {selectedCar.intel.frequentCons.map((c, i) => (
-                      <div key={i} className="flex items-start gap-2 text-xs mb-1.5">
-                        <span className="text-danger shrink-0 mt-0.5">-</span>
-                        <span>{c}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Common Issues */}
-            {selectedCar.intel && selectedCar.intel.commonIssues.length > 0 && (
-              <div className="bg-yellow-50 dark:bg-yellow-900/10 rounded-xl p-4">
-                <h4 className="text-sm font-bold text-yellow-700 dark:text-yellow-400 mb-2">خرابی‌های رایج</h4>
-                {selectedCar.intel.commonIssues.map((issue, i) => (
-                  <div key={i} className="flex items-start gap-2 text-xs text-yellow-700 dark:text-yellow-400 mb-1.5">
-                    <span className="shrink-0 mt-0.5">!</span>
-                    <span>{issue}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Purchase Warnings */}
-            {selectedCar.intel && selectedCar.intel.purchaseWarnings.length > 0 && (
-              <div className="bg-danger/5 rounded-xl p-4">
-                <h4 className="text-sm font-bold text-danger mb-2">هشدارهای خرید</h4>
-                {selectedCar.intel.purchaseWarnings.map((w, i) => (
-                  <div key={i} className="flex items-start gap-2 text-xs text-danger mb-1.5">
-                    <span className="shrink-0 mt-0.5">!</span>
-                    <span>{w}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Owner Verdict */}
-            {selectedCar.intel && (
-              <div className="bg-background rounded-xl p-4">
-                <h4 className="text-sm font-bold mb-2">نظر مالکان</h4>
-                <p className="text-sm leading-7 text-muted">{selectedCar.intel.ownerVerdict}</p>
-              </div>
-            )}
-
-            {/* Specs */}
-            {selectedCar.specs && (
-              <div>
-                <h4 className="text-sm font-bold mb-2">مشخصات فنی</h4>
-                <div className="flex flex-wrap gap-2">
-                  {selectedCar.specs.engine && (
-                    <span className="text-xs bg-background px-3 py-1.5 rounded-lg">موتور: {String(selectedCar.specs.engine)}</span>
-                  )}
-                  {selectedCar.specs.horsepower && (
-                    <span className="text-xs bg-background px-3 py-1.5 rounded-lg">{toPersianDigits(String(selectedCar.specs.horsepower))} اسب بخار</span>
-                  )}
-                  {selectedCar.specs.fuelConsumption && (
-                    <span className="text-xs bg-background px-3 py-1.5 rounded-lg">مصرف: {toPersianDigits(String(selectedCar.specs.fuelConsumption))} لیتر</span>
-                  )}
-                  {selectedCar.specs.transmission && (
-                    <span className="text-xs bg-background px-3 py-1.5 rounded-lg">
-                      {selectedCar.specs.transmission === "automatic" ? "اتوماتیک" : selectedCar.specs.transmission === "manual" ? "دنده‌ای" : String(selectedCar.specs.transmission)}
-                    </span>
-                  )}
+            {/* Owner Verdict + Specs - combined */}
+            <div className="bg-background rounded-xl p-4 space-y-3">
+              {selectedCar.intel && (
+                <div>
+                  <h4 className="text-xs font-black mb-1.5">نظر مالکان</h4>
+                  <p className="text-[11px] leading-6 text-muted">{selectedCar.intel.ownerVerdict}</p>
                 </div>
-              </div>
-            )}
+              )}
+              {selectedCar.specs && (
+                <div className={selectedCar.intel ? "pt-3 border-t border-border" : ""}>
+                  <h4 className="text-xs font-black mb-2">مشخصات فنی</h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedCar.specs.engine && (
+                      <span className="text-[11px] bg-surface px-2.5 py-1 rounded-lg">{String(selectedCar.specs.engine)}</span>
+                    )}
+                    {selectedCar.specs.horsepower && (
+                      <span className="text-[11px] bg-surface px-2.5 py-1 rounded-lg">{toPersianDigits(String(selectedCar.specs.horsepower))} اسب</span>
+                    )}
+                    {selectedCar.specs.fuelConsumption && (
+                      <span className="text-[11px] bg-surface px-2.5 py-1 rounded-lg">مصرف {toPersianDigits(String(selectedCar.specs.fuelConsumption))} لیتر</span>
+                    )}
+                    {selectedCar.specs.transmission && (
+                      <span className="text-[11px] bg-surface px-2.5 py-1 rounded-lg">
+                        {selectedCar.specs.transmission === "automatic" ? "اتوماتیک" : selectedCar.specs.transmission === "manual" ? "دنده‌ای" : String(selectedCar.specs.transmission)}
+                      </span>
+                    )}
+                    {selectedCar.specs.fuelType && (
+                      <span className="text-[11px] bg-surface px-2.5 py-1 rounded-lg">
+                        {selectedCar.specs.fuelType === "gasoline" ? "بنزینی" : selectedCar.specs.fuelType === "diesel" ? "دیزلی" : selectedCar.specs.fuelType === "hybrid" ? "هیبریدی" : String(selectedCar.specs.fuelType)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
-            {/* Similar Cars */}
-            {selectedCar.similarCars && selectedCar.similarCars.length > 0 && (
+            {/* Similar Cars + Alternatives - horizontal scroll */}
+            {((selectedCar.similarCars && selectedCar.similarCars.length > 0) || (selectedCar.alternatives && selectedCar.alternatives.length > 0)) && (
               <div>
-                <h4 className="text-sm font-bold mb-2">ماشین‌های مشابه</h4>
-                <div className="space-y-2">
-                  {selectedCar.similarCars.map((sc) => (
+                <h4 className="text-xs font-black mb-2">ماشین‌های مشابه و جایگزین</h4>
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                  {selectedCar.similarCars?.map((sc) => (
                     <button
                       key={sc.id}
                       onClick={() => openCarDetail(sc.id)}
-                      className="w-full flex items-center justify-between bg-background rounded-xl px-4 py-3 text-right"
+                      className="shrink-0 bg-background rounded-xl px-3 py-2.5 min-w-[140px] text-right"
                     >
-                      <div>
-                        <span className="text-sm font-bold">{sc.nameFa}</span>
-                        <span className="text-xs text-muted mr-2">{sc.brandFa}</span>
-                      </div>
-                      <span className="text-xs text-primary font-bold">
-                        {toPersianDigits(formatPrice(sc.priceMin))}
-                      </span>
+                      <div className="text-xs font-bold">{sc.nameFa}</div>
+                      <div className="text-[10px] text-muted">{sc.brandFa}</div>
+                      <div className="text-[11px] text-primary font-bold mt-1">{toPersianDigits(formatPrice(sc.priceMin))}</div>
                     </button>
                   ))}
-                </div>
-              </div>
-            )}
-
-            {/* Alternatives */}
-            {selectedCar.alternatives && selectedCar.alternatives.length > 0 && (
-              <div>
-                <h4 className="text-sm font-bold mb-2">جایگزین‌ها</h4>
-                <div className="space-y-2">
-                  {selectedCar.alternatives.map((alt) => (
+                  {selectedCar.alternatives?.map((alt) => (
                     <button
                       key={alt.id}
                       onClick={() => openCarDetail(alt.id)}
-                      className="w-full flex items-center justify-between bg-background rounded-xl px-4 py-3 text-right"
+                      className="shrink-0 bg-accent/5 border border-accent/15 rounded-xl px-3 py-2.5 min-w-[140px] text-right"
                     >
-                      <div>
-                        <span className="text-sm font-bold">{alt.nameFa}</span>
-                        <span className="text-xs text-muted mr-2">{alt.brandFa}</span>
-                      </div>
-                      <span className="text-xs text-primary font-bold">
-                        {toPersianDigits(formatPrice(alt.priceMin))}
-                      </span>
+                      <div className="text-xs font-bold">{alt.nameFa}</div>
+                      <div className="text-[10px] text-muted">{alt.brandFa}</div>
+                      <div className="text-[11px] text-accent font-bold mt-1">{toPersianDigits(formatPrice(alt.priceMin))}</div>
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* User Reviews */}
+            {/* User Reviews - compact */}
             {selectedCar.reviews && selectedCar.reviews.length > 0 && (
               <div>
-                <h4 className="text-sm font-bold mb-2">نظرات کاربران</h4>
-                <div className="space-y-3">
-                  {selectedCar.reviews.slice(0, 3).map((r, i) => (
+                <h4 className="text-xs font-black mb-2">نظرات کاربران</h4>
+                <div className="space-y-2">
+                  {selectedCar.reviews.slice(0, 2).map((r, i) => (
                     <div key={i} className="bg-background rounded-xl p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs bg-surface px-2 py-0.5 rounded-full text-muted">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] bg-surface px-2 py-0.5 rounded-full text-muted">
                           {r.source === "bama" ? "باما" : r.source === "expert" ? "کارشناس" : "کاربر"}
                         </span>
                         {r.rating && (
-                          <span className="text-xs font-bold text-primary">
+                          <span className="text-[11px] font-bold text-primary">
                             {toPersianDigits(r.rating.toFixed(1))} از ۵
                           </span>
                         )}
                       </div>
-                      <p className="text-xs leading-6 text-muted mb-2">{r.summary}</p>
-                      {r.pros.length > 0 && (
-                        <div className="space-y-1 mb-1">
-                          {r.pros.slice(0, 2).map((p, j) => (
-                            <div key={j} className="flex items-start gap-1.5 text-xs text-accent">
-                              <span className="shrink-0">+</span>
-                              <span>{p}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {r.cons.length > 0 && (
-                        <div className="space-y-1">
-                          {r.cons.slice(0, 2).map((c, j) => (
-                            <div key={j} className="flex items-start gap-1.5 text-xs text-danger">
-                              <span className="shrink-0">-</span>
-                              <span>{c}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <p className="text-[11px] leading-5 text-muted mb-1.5">{r.summary}</p>
+                      <div className="flex gap-3">
+                        {r.pros.length > 0 && (
+                          <div className="flex-1 space-y-0.5">
+                            {r.pros.slice(0, 2).map((p, j) => (
+                              <div key={j} className="flex items-start gap-1 text-[10px] text-accent">
+                                <span className="shrink-0 font-bold">+</span>
+                                <span className="line-clamp-1">{p}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {r.cons.length > 0 && (
+                          <div className="flex-1 space-y-0.5">
+                            {r.cons.slice(0, 2).map((c, j) => (
+                              <div key={j} className="flex items-start gap-1 text-[10px] text-danger">
+                                <span className="shrink-0 font-bold">-</span>
+                                <span className="line-clamp-1">{c}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

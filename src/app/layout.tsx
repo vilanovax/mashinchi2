@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import ThemeProvider from "@/components/ThemeProvider";
+import BottomNav from "@/components/BottomNav";
 
 export const metadata: Metadata = {
   title: "ماشینچی | دستیار هوشمند خرید خودرو",
@@ -27,14 +29,33 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fa" dir="rtl" className="h-full">
+    <html lang="fa" dir="rtl" className="h-full" suppressHydrationWarning>
       <head>
         <link
           href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css"
           rel="stylesheet"
         />
+        {/* Prevent flash of wrong theme */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var t = localStorage.getItem('mashinchi-theme');
+                  var dark = t === 'dark' || (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                  if (dark) document.documentElement.classList.add('dark');
+                } catch(e) {}
+              })();
+            `,
+          }}
+        />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <ThemeProvider>
+          {children}
+          <BottomNav />
+        </ThemeProvider>
+      </body>
     </html>
   );
 }
