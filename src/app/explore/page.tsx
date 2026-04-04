@@ -86,6 +86,8 @@ function ExploreContent() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [carDetail, setCarDetail] = useState<CarDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  // Touch swipe (already handled by cardRef handlers below)
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
 
   // Load favorites on mount
