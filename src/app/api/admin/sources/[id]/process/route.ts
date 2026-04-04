@@ -4,7 +4,7 @@ import { verifyAdmin, unauthorizedResponse } from "@/lib/adminAuth";
 import { callAI } from "@/lib/ai-provider";
 import { logAction } from "@/lib/auditLog";
 
-// POST - process source text with AI
+// POST - deep process source text with AI + compare with existing data
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await verifyAdmin(request);
   if (!session) return unauthorizedResponse();
@@ -12,99 +12,226 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const source = await prisma.carSource.findUnique({
     where: { id },
-    include: { car: { select: { nameFa: true, nameEn: true, brandFa: true, category: true, origin: true } } },
+    include: {
+      car: {
+        include: {
+          scores: true,
+          intel: true,
+          reviews: { select: { summary: true, pros: true, cons: true, warnings: true, rating: true, source: true } },
+        },
+      },
+    },
   });
 
   if (!source) return NextResponse.json({ error: "Source not found" }, { status: 404 });
 
-  const prompt = `تو یک تحلیلگر تخصصی خودرو هستی. متن زیر از منبع "${source.sourceSite}" درباره خودروی ${source.car.nameFa} (${source.car.nameEn}) - ${source.car.brandFa} است.
+  const car = source.car;
+  const existingIntel = car.intel;
+  const existingReviews = car.reviews;
+  const existingScores = car.scores;
 
-متن منبع:
----
-${source.rawText.slice(0, 4000)}
----
+  // Build context of existing data for AI
+  const existingContext = `
+=== داده‌های فعلی این خودرو ===
+${existingIntel ? `جمع‌بندی فعلی: ${existingIntel.overallSummary}
+چرا بخری: ${existingIntel.whyBuy}
+چرا نخری: ${existingIntel.whyNotBuy}
+نقاط قوت فعلی: ${existingIntel.frequentPros.join(" | ")}
+نقاط ضعف فعلی: ${existingIntel.frequentCons.join(" | ")}
+خرابی‌های رایج: ${existingIntel.commonIssues.join(" | ")}
+هشدارها: ${existingIntel.purchaseWarnings.join(" | ")}
+نظر مالکان: ${existingIntel.ownerVerdict}
+رضایت مالکان: ${existingIntel.ownerSatisfaction}/10
+ریسک خرید: ${existingIntel.purchaseRisk}/10` : "هیچ اطلاعات هوشمندی ثبت نشده."}
 
-لطفا این متن را تحلیل کن و خروجی JSON بده با این فرمت دقیق:
+${existingScores ? `امتیازات فعلی: راحتی ${existingScores.comfort}, عملکرد ${existingScores.performance}, اقتصادی ${existingScores.economy}, ایمنی ${existingScores.safety}, پرستیژ ${existingScores.prestige}, اطمینان ${existingScores.reliability}, نقدشوندگی ${existingScores.resaleValue}, خانوادگی ${existingScores.familyFriendly}, اسپرت ${existingScores.sportiness}, آفرود ${existingScores.offroad}, شهری ${existingScores.cityDriving}, سفر ${existingScores.longTrip}, ریسک نگهداری ${existingScores.maintenanceRisk}, خدمات ${existingScores.afterSales}` : ""}
+
+${existingReviews.length > 0 ? `نظرات موجود (${existingReviews.length} عدد):
+${existingReviews.slice(0, 3).map((r, i) => `${i + 1}. [${r.source}] ${r.summary.slice(0, 100)}`).join("\n")}` : "نظری ثبت نشده."}
+`;
+
+  const prompt = `تو یک تحلیلگر ارشد خودرو هستی. یک متن جدید درباره ${car.nameFa} (${car.nameEn}) - ${car.brandFa} داری.
+
+وظیفه‌ات:
+1. متن جدید رو عمیقا تحلیل کن
+2. با داده‌های فعلی مقایسه کن
+3. مشخص کن چه اطلاعات جدیدی وجود داره
+4. امتیازات رو با دلیل بده
+
+${existingContext}
+
+=== متن جدید از ${source.sourceSite} ===
+${source.rawText.slice(0, 5000)}
+===
+
+خروجی JSON بده:
+
 {
-  "summary": "خلاصه ۳-۴ جمله‌ای از محتوا به فارسی",
-  "pros": ["نقطه قوت ۱", "نقطه قوت ۲", "نقطه قوت ۳"],
-  "cons": ["نقطه ضعف ۱", "نقطه ضعف ۲", "نقطه ضعف ۳"],
-  "issues": ["مشکل رایج ۱", "مشکل رایج ۲"],
-  "warnings": ["هشدار خرید ۱"],
+  "deepSummary": "تحلیل عمیق ۵-۷ جمله‌ای از متن. نکات کلیدی، تجربیات واقعی، و بینش‌های مهم رو استخراج کن.",
+
+  "newInsights": [
+    "نکته جدیدی که در داده‌های فعلی نبود ۱",
+    "نکته جدید ۲",
+    "نکته جدید ۳"
+  ],
+
+  "confirmedFacts": [
+    "موردی که در داده‌های قبلی هم بود و این متن تاییدش کرد ۱",
+    "مورد تایید‌شده ۲"
+  ],
+
+  "contradictions": [
+    "موردی که با داده‌های قبلی تناقض داره (اگر هست)"
+  ],
+
+  "extractedPros": [
+    "نقطه قوت ۱ - با جزئیات از متن (مثال: مصرف سوخت ترکیبی ۷.۵ لیتر که برای موتور ۱.۵ توربو عالیه)",
+    "نقطه قوت ۲",
+    "نقطه قوت ۳",
+    "نقطه قوت ۴"
+  ],
+
+  "extractedCons": [
+    "نقطه ضعف ۱ - دقیق از متن",
+    "نقطه ضعف ۲",
+    "نقطه ضعف ۳"
+  ],
+
+  "extractedIssues": [
+    "خرابی/مشکل رایج ذکرشده در متن"
+  ],
+
+  "extractedWarnings": [
+    "هشدار خرید از متن"
+  ],
+
   "scores": {
-    "comfort": 7,
-    "performance": 6,
-    "economy": 8,
-    "safety": 6,
-    "prestige": 5,
-    "reliability": 6,
-    "resaleValue": 5,
-    "familyFriendly": 7,
-    "sportiness": 4,
-    "offroad": 3,
-    "cityDriving": 8,
-    "longTrip": 6,
-    "maintenanceRisk": 5,
-    "afterSales": 5
+    "comfort": { "value": 7, "reason": "دلیل از متن" },
+    "performance": { "value": 6, "reason": "دلیل" },
+    "economy": { "value": 8, "reason": "دلیل" },
+    "safety": { "value": 6, "reason": "دلیل" },
+    "prestige": { "value": 5, "reason": "دلیل" },
+    "reliability": { "value": 6, "reason": "دلیل" },
+    "resaleValue": { "value": 5, "reason": "دلیل" },
+    "familyFriendly": { "value": 7, "reason": "دلیل" },
+    "sportiness": { "value": 4, "reason": "دلیل" },
+    "offroad": { "value": 3, "reason": "دلیل" },
+    "cityDriving": { "value": 8, "reason": "دلیل" },
+    "longTrip": { "value": 6, "reason": "دلیل" },
+    "maintenanceRisk": { "value": 5, "reason": "دلیل" },
+    "afterSales": { "value": 5, "reason": "دلیل" }
   },
+
   "rating": 3.5,
-  "ownerSatisfaction": 6,
-  "purchaseRisk": 5
+  "ownerSatisfaction": { "value": 7, "reason": "دلیل" },
+  "purchaseRisk": { "value": 4, "reason": "دلیل" },
+
+  "recommendation": "توصیه نهایی: آیا این اطلاعات جدید ارزش اعمال دارد؟ چه تغییراتی پیشنهاد میشه؟ (۲-۳ جمله)"
 }
 
 قوانین:
-- فقط فارسی بنویس
-- امتیازات ۱ تا ۱۰ (عدد صحیح)
-- rating از ۱ تا ۵ (اعشار)
-- واقع‌بینانه بر اساس متن باش
-- اگر اطلاعاتی از متن قابل استخراج نیست، مقدار پیش‌فرض ۵ بده
-- فقط JSON خالص بده، بدون توضیح اضافه`;
+- فقط فارسی
+- امتیازات ۱-۱۰ عدد صحیح
+- اگر متن اطلاعاتی برای یک فیلد نداره، مقدار فعلی رو حفظ کن
+- صادقانه بگو اگر متن چیز مفید جدیدی نداره
+- فقط JSON خالص`;
 
   try {
-    const text = await callAI(prompt, 2000);
-
+    const text = await callAI(prompt, 3000);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      return NextResponse.json({ error: "Failed to parse AI response", raw: text }, { status: 500 });
+      return NextResponse.json({ error: "Failed to parse AI response", raw: text.slice(0, 500) }, { status: 500 });
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
 
-    // Update source with processed data
+    // Build score values and comparisons
+    const scoreComparisons: Record<string, { old: number; new: number; reason: string; changed: boolean }> = {};
+    const scoreValues: Record<string, number> = {};
+
+    for (const [key, val] of Object.entries(parsed.scores || {})) {
+      const scoreData = val as { value: number; reason: string };
+      const oldVal = existingScores ? (existingScores as unknown as Record<string, number>)[key] || 5 : 5;
+      const newVal = typeof scoreData === "object" ? scoreData.value : (scoreData as number);
+      scoreComparisons[key] = {
+        old: oldVal,
+        new: newVal,
+        reason: typeof scoreData === "object" ? scoreData.reason : "",
+        changed: oldVal !== newVal,
+      };
+      scoreValues[key] = newVal;
+    }
+
+    // Build extracted scores JSON with flat values for storage
+    const flatScores: Record<string, number> = { ...scoreValues };
+    if (parsed.ownerSatisfaction) {
+      flatScores.ownerSatisfaction = typeof parsed.ownerSatisfaction === "object" ? parsed.ownerSatisfaction.value : parsed.ownerSatisfaction;
+    }
+    if (parsed.purchaseRisk) {
+      flatScores.purchaseRisk = typeof parsed.purchaseRisk === "object" ? parsed.purchaseRisk.value : parsed.purchaseRisk;
+    }
+    if (parsed.rating) flatScores.rating = parsed.rating;
+
+    // Store processed data
     await prisma.carSource.update({
       where: { id },
       data: {
-        processedSummary: parsed.summary || "",
-        extractedPros: parsed.pros || [],
-        extractedCons: parsed.cons || [],
-        extractedIssues: parsed.issues || [],
-        extractedWarnings: parsed.warnings || [],
+        processedSummary: parsed.deepSummary || "",
+        extractedPros: parsed.extractedPros || [],
+        extractedCons: parsed.extractedCons || [],
+        extractedIssues: parsed.extractedIssues || [],
+        extractedWarnings: parsed.extractedWarnings || [],
         extractedScores: JSON.stringify({
-          ...parsed.scores,
-          rating: parsed.rating,
+          scores: scoreComparisons,
           ownerSatisfaction: parsed.ownerSatisfaction,
           purchaseRisk: parsed.purchaseRisk,
+          rating: parsed.rating,
+          newInsights: parsed.newInsights,
+          confirmedFacts: parsed.confirmedFacts,
+          contradictions: parsed.contradictions,
+          recommendation: parsed.recommendation,
         }),
         status: "processed",
       },
     });
 
-    await logAction("update", "source", id, { action: "ai_process", carId: source.carId });
+    await logAction("update", "source", id, { action: "deep_process", carId: source.carId });
+
+    // Build diff for frontend
+    const existingPros = existingIntel?.frequentPros || [];
+    const existingCons = existingIntel?.frequentCons || [];
 
     return NextResponse.json({
       success: true,
-      summary: parsed.summary,
-      pros: parsed.pros,
-      cons: parsed.cons,
-      issues: parsed.issues,
-      warnings: parsed.warnings,
-      scores: parsed.scores,
-      rating: parsed.rating,
+      deepSummary: parsed.deepSummary,
+      newInsights: parsed.newInsights || [],
+      confirmedFacts: parsed.confirmedFacts || [],
+      contradictions: parsed.contradictions || [],
+      recommendation: parsed.recommendation,
+
+      extractedPros: parsed.extractedPros || [],
+      extractedCons: parsed.extractedCons || [],
+      extractedIssues: parsed.extractedIssues || [],
+      extractedWarnings: parsed.extractedWarnings || [],
+
+      scoreComparisons,
       ownerSatisfaction: parsed.ownerSatisfaction,
       purchaseRisk: parsed.purchaseRisk,
+      rating: parsed.rating,
+
+      // Diff data
+      diff: {
+        prosNew: (parsed.extractedPros || []).filter((p: string) => !existingPros.some((ep) => ep.includes(p.slice(0, 15)) || p.includes(ep.slice(0, 15)))),
+        prosExisting: existingPros,
+        consNew: (parsed.extractedCons || []).filter((c: string) => !existingCons.some((ec) => ec.includes(c.slice(0, 15)) || c.includes(ec.slice(0, 15)))),
+        consExisting: existingCons,
+        summaryOld: existingIntel?.overallSummary || "",
+        summaryNew: parsed.deepSummary || "",
+        scoresChanged: Object.entries(scoreComparisons).filter(([, v]) => v.changed).length,
+      },
     });
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: `AI processing failed: ${errMsg}` }, { status: 500 });
+    return NextResponse.json({ error: `Processing failed: ${errMsg}` }, { status: 500 });
   }
 }

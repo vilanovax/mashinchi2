@@ -298,33 +298,95 @@ export default function AdminSourcesPage() {
               {isExpanded && (
                 <div className="border-t border-border px-4 py-3 space-y-3 bg-background/20">
                   {/* Raw text */}
-                  <div className="bg-background rounded-lg p-3 text-[11px] leading-6 max-h-[150px] overflow-y-auto">{src.rawTextFull}</div>
+                  <details className="group">
+                    <summary className="text-[10px] font-bold text-muted cursor-pointer mb-1">متن خام ({toPersianDigits(src.rawTextFull.length)} کاراکتر)</summary>
+                    <div className="bg-background rounded-lg p-3 text-[11px] leading-6 max-h-[200px] overflow-y-auto mt-1">{src.rawTextFull}</div>
+                  </details>
                   {src.url && <a href={src.url} target="_blank" rel="noopener noreferrer" className="text-[9px] text-primary hover:underline" dir="ltr">{src.url}</a>}
 
-                  {/* AI results */}
+                  {/* Deep summary */}
                   {src.processedSummary && (
-                    <div className="bg-primary/5 border border-primary/15 rounded-lg p-3">
-                      <h4 className="text-[10px] font-black text-primary mb-1">خلاصه AI</h4>
-                      <p className="text-[11px] leading-6">{src.processedSummary}</p>
+                    <div className="bg-primary/5 border border-primary/15 rounded-xl p-4">
+                      <h4 className="text-[10px] font-black text-primary mb-2">تحلیل عمیق</h4>
+                      <p className="text-[11px] leading-7">{src.processedSummary}</p>
                     </div>
                   )}
 
+                  {/* New insights / Confirmed / Contradictions */}
+                  {scores?.newInsights && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {scores.newInsights?.length > 0 && (
+                        <div className="bg-accent/5 border border-accent/15 rounded-lg p-3">
+                          <h5 className="text-[9px] font-black text-accent mb-1.5">نکات جدید</h5>
+                          {scores.newInsights.map((n: string, i: number) => (
+                            <div key={i} className="text-[10px] mb-1 flex items-start gap-1"><span className="text-accent font-bold shrink-0">*</span><span>{n}</span></div>
+                          ))}
+                        </div>
+                      )}
+                      {scores.confirmedFacts?.length > 0 && (
+                        <div className="bg-primary/5 border border-primary/15 rounded-lg p-3">
+                          <h5 className="text-[9px] font-black text-primary mb-1.5">تایید‌شده</h5>
+                          {scores.confirmedFacts.map((f: string, i: number) => (
+                            <div key={i} className="text-[10px] mb-1 flex items-start gap-1"><span className="text-primary font-bold shrink-0">~</span><span>{f}</span></div>
+                          ))}
+                        </div>
+                      )}
+                      {scores.contradictions?.length > 0 && (
+                        <div className="bg-danger/5 border border-danger/15 rounded-lg p-3">
+                          <h5 className="text-[9px] font-black text-danger mb-1.5">تناقض‌ها</h5>
+                          {scores.contradictions.map((c: string, i: number) => (
+                            <div key={i} className="text-[10px] mb-1 flex items-start gap-1"><span className="text-danger font-bold shrink-0">!</span><span>{c}</span></div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Pros & Cons with detail */}
                   {(src.extractedPros.length > 0 || src.extractedCons.length > 0) && (
                     <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        {src.extractedPros.map((p, i) => (<div key={i} className="flex items-start gap-1 text-[10px] mb-0.5"><span className="text-accent font-bold">+</span><span>{p}</span></div>))}
-                      </div>
-                      <div>
-                        {src.extractedCons.map((c, i) => (<div key={i} className="flex items-start gap-1 text-[10px] mb-0.5"><span className="text-danger font-bold">-</span><span>{c}</span></div>))}
+                      {src.extractedPros.length > 0 && (
+                        <div className="bg-surface rounded-lg border border-border p-3">
+                          <h5 className="text-[9px] font-black text-accent mb-1.5">نقاط قوت</h5>
+                          {src.extractedPros.map((p, i) => (<div key={i} className="flex items-start gap-1.5 text-[10px] mb-1 leading-5"><span className="text-accent font-bold shrink-0 mt-0.5">+</span><span>{p}</span></div>))}
+                        </div>
+                      )}
+                      {src.extractedCons.length > 0 && (
+                        <div className="bg-surface rounded-lg border border-border p-3">
+                          <h5 className="text-[9px] font-black text-danger mb-1.5">نقاط ضعف</h5>
+                          {src.extractedCons.map((c, i) => (<div key={i} className="flex items-start gap-1.5 text-[10px] mb-1 leading-5"><span className="text-danger font-bold shrink-0 mt-0.5">-</span><span>{c}</span></div>))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Score comparisons with reasons */}
+                  {scores?.scores && (
+                    <div className="bg-surface rounded-lg border border-border p-3">
+                      <h5 className="text-[9px] font-black mb-2">مقایسه امتیازات (قبل → بعد)</h5>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                        {Object.entries(scores.scores as Record<string, { old: number; new: number; reason: string; changed: boolean }>).map(([key, val]) => (
+                          <div key={key} className="flex items-center gap-2">
+                            <span className="text-[9px] text-muted w-16 shrink-0">{key}</span>
+                            <span className={`text-[10px] font-bold w-4 text-center ${val.changed ? "text-muted line-through" : ""}`}>{toPersianDigits(val.old)}</span>
+                            {val.changed && (
+                              <>
+                                <span className="text-[9px] text-muted">→</span>
+                                <span className={`text-[10px] font-black w-4 text-center ${val.new > val.old ? "text-accent" : val.new < val.old ? "text-danger" : ""}`}>{toPersianDigits(val.new)}</span>
+                              </>
+                            )}
+                            {val.reason && <span className="text-[8px] text-muted truncate flex-1" title={val.reason}>{val.reason}</span>}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
 
-                  {scores && (
-                    <div className="flex flex-wrap gap-1">
-                      {Object.entries(scores).filter(([, v]) => typeof v === "number").map(([k, v]) => (
-                        <span key={k} className="text-[8px] bg-background px-1.5 py-0.5 rounded font-mono">{k}: {toPersianDigits(v as number)}</span>
-                      ))}
+                  {/* AI Recommendation */}
+                  {scores?.recommendation && (
+                    <div className="bg-amber-500/5 border border-amber-500/15 rounded-lg p-3">
+                      <h5 className="text-[9px] font-black text-amber-700 dark:text-amber-400 mb-1">توصیه AI</h5>
+                      <p className="text-[10px] leading-5">{scores.recommendation}</p>
                     </div>
                   )}
 
@@ -332,14 +394,16 @@ export default function AdminSourcesPage() {
                   <div className="flex gap-2 pt-2 border-t border-border">
                     {src.status === "pending" && (
                       <button onClick={() => handleProcess(src.id)} disabled={!!processingId} className="px-3 py-1.5 bg-primary text-white text-[10px] font-bold rounded-lg disabled:opacity-50 flex items-center gap-1">
-                        {processingId === src.id ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> پردازش...</> : "پردازش با AI"}
+                        {processingId === src.id ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> تحلیل عمیق...</> : <><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg> تحلیل عمیق با AI</>}
                       </button>
                     )}
                     {src.status === "processed" && (
                       <>
-                        <button onClick={() => handleApply(src.id)} disabled={!!applyingId} className="px-3 py-1.5 bg-accent text-white text-[10px] font-bold rounded-lg disabled:opacity-50">{applyingId === src.id ? "..." : "تایید و اعمال"}</button>
+                        <button onClick={() => handleApply(src.id)} disabled={!!applyingId} className="px-3 py-1.5 bg-accent text-white text-[10px] font-bold rounded-lg disabled:opacity-50 flex items-center gap-1">
+                          {applyingId === src.id ? "..." : <><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" /></svg> تایید و اعمال</>}
+                        </button>
                         <button onClick={() => handleReject(src.id)} className="px-3 py-1.5 text-[10px] text-danger font-bold bg-danger/5 rounded-lg">رد</button>
-                        <button onClick={() => handleProcess(src.id)} disabled={!!processingId} className="px-3 py-1.5 text-[10px] text-muted font-bold bg-background rounded-lg disabled:opacity-50">پردازش مجدد</button>
+                        <button onClick={() => handleProcess(src.id)} disabled={!!processingId} className="px-3 py-1.5 text-[10px] text-muted font-bold bg-background rounded-lg disabled:opacity-50">تحلیل مجدد</button>
                       </>
                     )}
                     {src.status === "approved" && (
