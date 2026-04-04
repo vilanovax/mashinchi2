@@ -4,7 +4,7 @@ import { verifyAdmin, unauthorizedResponse } from "@/lib/adminAuth";
 import { logAction } from "@/lib/auditLog";
 
 export async function GET(request: NextRequest) {
-  if (!verifyAdmin(request)) return unauthorizedResponse();
+  const _s = await verifyAdmin(request); if (!_s) return unauthorizedResponse();
 
   const carId = request.nextUrl.searchParams.get("carId");
   if (!carId) return NextResponse.json({ error: "carId required" }, { status: 400 });
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!verifyAdmin(request)) return unauthorizedResponse();
+  const _s = await verifyAdmin(request); if (!_s) return unauthorizedResponse();
   const body = await request.json();
 
   const newPrice = BigInt(body.price);

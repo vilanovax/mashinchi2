@@ -6,7 +6,7 @@ import Anthropic from "@anthropic-ai/sdk";
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(request: NextRequest) {
-  if (!verifyAdmin(request)) return unauthorizedResponse();
+  const _s = await verifyAdmin(request); if (!_s) return unauthorizedResponse();
 
   const { carId, type } = await request.json();
   if (!carId || !type) return NextResponse.json({ error: "carId and type required" }, { status: 400 });

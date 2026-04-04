@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { verifyAdmin, unauthorizedResponse } from "@/lib/adminAuth";
 
 export async function GET(request: NextRequest) {
-  if (!verifyAdmin(request)) return unauthorizedResponse();
+  const session = await verifyAdmin(request);
+  if (!session) return unauthorizedResponse();
 
   const [totalCars, totalUsers, totalInteractions, totalFavorites, totalReviews] = await Promise.all([
     prisma.car.count(),

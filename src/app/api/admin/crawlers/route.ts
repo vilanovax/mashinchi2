@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyAdmin, unauthorizedResponse } from "@/lib/adminAuth";
 
 export async function GET(request: NextRequest) {
-  if (!verifyAdmin(request)) return unauthorizedResponse();
+  const _s = await verifyAdmin(request); if (!_s) return unauthorizedResponse();
 
   const crawlers = await prisma.crawlerConfig.findMany({ orderBy: { createdAt: "desc" } });
   return NextResponse.json(crawlers.map((c) => ({
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!verifyAdmin(request)) return unauthorizedResponse();
+  const _s = await verifyAdmin(request); if (!_s) return unauthorizedResponse();
   const body = await request.json();
 
   const crawler = await prisma.crawlerConfig.create({

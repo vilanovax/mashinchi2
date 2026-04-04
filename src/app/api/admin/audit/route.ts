@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyAdmin, unauthorizedResponse } from "@/lib/adminAuth";
 
 export async function GET(request: NextRequest) {
-  if (!verifyAdmin(request)) return unauthorizedResponse();
+  const _s = await verifyAdmin(request); if (!_s) return unauthorizedResponse();
 
   const entity = request.nextUrl.searchParams.get("entity");
   const limit = parseInt(request.nextUrl.searchParams.get("limit") || "50");

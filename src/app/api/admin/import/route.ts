@@ -20,7 +20,7 @@ interface ImportCar {
 }
 
 export async function POST(request: NextRequest) {
-  if (!verifyAdmin(request)) return unauthorizedResponse();
+  const _s = await verifyAdmin(request); if (!_s) return unauthorizedResponse();
 
   const body = await request.json();
   const { cars, mode = "skip" } = body as { cars: ImportCar[]; mode: "skip" | "update" };

@@ -4,7 +4,7 @@ import { verifyAdmin, unauthorizedResponse } from "@/lib/adminAuth";
 
 // GET - list all cars with full data
 export async function GET(request: NextRequest) {
-  if (!verifyAdmin(request)) return unauthorizedResponse();
+  const _s = await verifyAdmin(request); if (!_s) return unauthorizedResponse();
 
   const cars = await prisma.car.findMany({
     include: { scores: true, specs: true, tags: true, intel: true, reviews: true },
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
 // POST - create new car
 export async function POST(request: NextRequest) {
-  if (!verifyAdmin(request)) return unauthorizedResponse();
+  const _s = await verifyAdmin(request); if (!_s) return unauthorizedResponse();
 
   const body = await request.json();
   const { nameEn, nameFa, brand, brandFa, category, year, priceMin, priceMax, origin, description, isNew } = body;

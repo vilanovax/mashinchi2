@@ -4,7 +4,7 @@ import { verifyAdmin, unauthorizedResponse } from "@/lib/adminAuth";
 
 // GET - list reviews with optional carId filter
 export async function GET(request: NextRequest) {
-  if (!verifyAdmin(request)) return unauthorizedResponse();
+  const _s = await verifyAdmin(request); if (!_s) return unauthorizedResponse();
 
   const carId = request.nextUrl.searchParams.get("carId");
 
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
 // POST - create review
 export async function POST(request: NextRequest) {
-  if (!verifyAdmin(request)) return unauthorizedResponse();
+  const _s = await verifyAdmin(request); if (!_s) return unauthorizedResponse();
   const body = await request.json();
 
   const review = await prisma.carReview.create({

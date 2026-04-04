@@ -9,7 +9,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export async function GET(request: NextRequest) {
-  if (!verifyAdmin(request)) return unauthorizedResponse();
+  const _s = await verifyAdmin(request); if (!_s) return unauthorizedResponse();
 
   const users = await prisma.user.findMany({
     include: {
