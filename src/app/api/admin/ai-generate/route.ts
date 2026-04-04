@@ -98,7 +98,8 @@ ${carInfo}
     const parsed = JSON.parse(jsonMatch[0]);
     return NextResponse.json({ result: parsed, type });
   } catch (error) {
-    console.error("AI generation error:", error);
-    return NextResponse.json({ error: "AI generation failed" }, { status: 500 });
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error("AI generation error:", errMsg);
+    return NextResponse.json({ error: `AI generation failed: ${errMsg}` }, { status: 500 });
   }
 }
