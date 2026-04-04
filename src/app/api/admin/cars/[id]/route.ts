@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyAdmin, unauthorizedResponse } from "@/lib/adminAuth";
+import { logAction } from "@/lib/auditLog";
 
 // PUT - update car and all related data
 export async function PUT(
@@ -77,6 +78,8 @@ export async function PUT(
 
   if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  await logAction("update", "car", id, { nameFa: updated.nameFa, sections: Object.keys(body).filter((k) => k !== "car") });
+
   return NextResponse.json({
     ...updated,
     priceMin: updated.priceMin.toString(),
@@ -93,6 +96,8 @@ export async function DELETE(
   if (!verifyAdmin(request)) return unauthorizedResponse();
   const { id } = await params;
 
+  const car = await prisma.car.findUnique({ where: { id }, select: { nameFa: true } });
   await prisma.car.delete({ where: { id } });
+  await logAction("delete", "car", id, { nameFa: car?.nameFa });
   return NextResponse.json({ success: true });
 }

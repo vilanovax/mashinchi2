@@ -18,6 +18,7 @@ interface CarData {
   priceMax: string;
   description: string | null;
   isNew: boolean;
+  imageUrl: string | null;
   scores: Record<string, number> | null;
   specs: Record<string, unknown> | null;
   intel: Record<string, unknown> | null;
@@ -308,6 +309,45 @@ export default function AdminCarEditPage({ params }: { params: Promise<{ id: str
               rows={3}
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary resize-none"
             />
+          </div>
+
+          {/* Image Upload */}
+          <div>
+            <label className="text-[11px] text-muted block mb-1">تصویر خودرو</label>
+            <div className="flex items-center gap-3">
+              {car.imageUrl ? (
+                <img src={car.imageUrl} alt={car.nameFa} className="w-20 h-14 object-cover rounded-lg border border-border" />
+              ) : (
+                <div className="w-20 h-14 bg-background rounded-lg border border-dashed border-border flex items-center justify-center">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted/40">
+                    <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" />
+                  </svg>
+                </div>
+              )}
+              <label className="px-3 py-1.5 bg-background border border-border rounded-lg text-[11px] font-bold cursor-pointer hover:bg-border/50 transition-colors">
+                آپلود
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    formData.append("carId", id);
+                    const res = await fetchAdmin("/api/admin/upload", { method: "POST", body: formData });
+                    if (res.ok) {
+                      const data = await res.json();
+                      setCar({ ...car, imageUrl: data.imageUrl } as CarData);
+                      showToast("تصویر آپلود شد");
+                    } else {
+                      showToast("خطا در آپلود");
+                    }
+                  }}
+                />
+              </label>
+            </div>
           </div>
 
           {/* Tags */}

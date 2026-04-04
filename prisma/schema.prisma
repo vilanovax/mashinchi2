@@ -218,3 +218,14 @@ model CrawlerConfig {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String   // "create", "update", "delete", "import", "ai_generate"
+  entity    String   // "car", "review", "crawler", "price", "settings"
+  entityId  String?  // ID of the affected record
+  details   String   // JSON string with change details
+  createdAt DateTime @default(now())
+
+  @@index([entity, createdAt])
+}
