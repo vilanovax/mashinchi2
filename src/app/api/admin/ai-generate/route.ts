@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyAdmin, unauthorizedResponse } from "@/lib/adminAuth";
-import Anthropic from "@anthropic-ai/sdk";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { callAI, getProviderInfo } from "@/lib/ai-provider";
 
 export async function POST(request: NextRequest) {
   const _s = await verifyAdmin(request); if (!_s) return unauthorizedResponse();
@@ -76,17 +74,19 @@ ${carInfo}
   }
 
   try {
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1500,
-      messages: [{ role: "user", content: prompt }],
-    });
+    // Use runtime config override if provided
+    const configOverride: Record<string, string> = {};
+    const runtimeProvider = request.headers.get("x-ai-provider");
+    const runtimeKey = request.headers.get("x-ai-key");
+    if (runtimeProvider) configOverride.provider = runtimeProvider;
+    if (runtimeKey && runtimeProvider === "openai") configOverride.openaiApiKey = runtimeKey;
+    if (runtimeKey && runtimeProvider === "claude") configOverride.claudeApiKey = runtimeKey;
 
-    const textBlock = message.content.find((b) => b.type === "text");
-    const text = textBlock?.text || "";
+    const text = await callAI(prompt, 1500, configOverride);
+    const providerInfo = getProviderInfo();
 
     if (type === "description") {
-      return NextResponse.json({ result: text.trim(), type: "description" });
+      return NextResponse.json({ result: text.trim(), type: "description", provider: providerInfo.provider });
     }
 
     // Parse JSON from response
@@ -96,7 +96,7 @@ ${carInfo}
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
-    return NextResponse.json({ result: parsed, type });
+    return NextResponse.json({ result: parsed, type, provider: providerInfo.provider });
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error("AI generation error:", errMsg);

@@ -1,8 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+import { callAI } from "./ai-provider";
 
 interface CarForAI {
   nameFa: string;
@@ -79,17 +75,6 @@ ${carsInfo}
 - کوتاه و مفید باش
 - مثل یک دوست آگاه صحبت کن، نه یک ربات`;
 
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 1500,
-    messages: [
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
-  });
-
-  const textBlock = message.content.find((block) => block.type === "text");
-  return textBlock ? textBlock.text : "خطا در تولید خلاصه";
+  const result = await callAI(prompt, 1500);
+  return result || "خطا در تولید خلاصه";
 }
