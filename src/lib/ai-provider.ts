@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
+import { prisma } from "@/lib/prisma";
 
 export type AIProvider = "claude" | "openai";
 
@@ -11,17 +12,41 @@ interface AIConfig {
   openaiModel?: string;
 }
 
-// Default config from env
-function getConfig(): AIConfig {
-  // Check localStorage-persisted settings (stored in a simple JSON file approach)
-  // For server-side, we use env vars
-  return {
-    provider: (process.env.AI_PROVIDER as AIProvider) || "claude",
-    claudeApiKey: process.env.ANTHROPIC_API_KEY,
-    claudeModel: process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514",
-    openaiApiKey: process.env.OPENAI_API_KEY,
-    openaiModel: process.env.OPENAI_MODEL || "gpt-4o",
-  };
+// Load settings from DB, fallback to env
+async function getConfigFromDB(): Promise<AIConfig> {
+  try {
+    const rows = await prisma.appSettings.findMany({
+      where: { key: { in: ["ai_provider", "ai_model_claude", "ai_model_openai", "ai_key_claude", "ai_key_openai"] } },
+    });
+    const db: Record<string, string> = {};
+    for (const r of rows) db[r.key] = r.value;
+
+    return {
+      provider: (db.ai_provider as AIProvider) || (process.env.AI_PROVIDER as AIProvider) || "claude",
+      claudeApiKey: db.ai_key_claude || process.env.ANTHROPIC_API_KEY,
+      claudeModel: db.ai_model_claude || process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514",
+      openaiApiKey: db.ai_key_openai || process.env.OPENAI_API_KEY,
+      openaiModel: db.ai_model_openai || process.env.OPENAI_MODEL || "gpt-4o",
+    };
+  } catch {
+    // DB not available, fallback to env
+    return {
+      provider: (process.env.AI_PROVIDER as AIProvider) || "claude",
+      claudeApiKey: process.env.ANTHROPIC_API_KEY,
+      claudeModel: process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514",
+      openaiApiKey: process.env.OPENAI_API_KEY,
+      openaiModel: process.env.OPENAI_MODEL || "gpt-4o",
+    };
+  }
+}
+
+// Sync version for display only (uses env)
+export function getProviderInfo(): { provider: AIProvider; model: string; hasKey: boolean } {
+  const provider = (process.env.AI_PROVIDER as AIProvider) || "claude";
+  if (provider === "openai") {
+    return { provider: "openai", model: process.env.OPENAI_MODEL || "gpt-4o", hasKey: !!process.env.OPENAI_API_KEY };
+  }
+  return { provider: "claude", model: process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514", hasKey: !!process.env.ANTHROPIC_API_KEY };
 }
 
 export async function callAI(
@@ -29,7 +54,8 @@ export async function callAI(
   maxTokens: number = 1500,
   configOverride?: Partial<AIConfig>
 ): Promise<string> {
-  const config = { ...getConfig(), ...configOverride };
+  const dbConfig = await getConfigFromDB();
+  const config = { ...dbConfig, ...configOverride };
 
   if (config.provider === "openai") {
     return callOpenAI(prompt, maxTokens, config);
@@ -38,7 +64,7 @@ export async function callAI(
 }
 
 async function callClaude(prompt: string, maxTokens: number, config: AIConfig): Promise<string> {
-  if (!config.claudeApiKey) throw new Error("ANTHROPIC_API_KEY not configured");
+  if (!config.claudeApiKey) throw new Error("کلید Anthropic تنظیم نشده. از تنظیمات ادمین وارد کنید.");
 
   const anthropic = new Anthropic({ apiKey: config.claudeApiKey });
 
@@ -53,7 +79,7 @@ async function callClaude(prompt: string, maxTokens: number, config: AIConfig): 
 }
 
 async function callOpenAI(prompt: string, maxTokens: number, config: AIConfig): Promise<string> {
-  if (!config.openaiApiKey) throw new Error("OPENAI_API_KEY not configured");
+  if (!config.openaiApiKey) throw new Error("کلید OpenAI تنظیم نشده. از تنظیمات ادمین وارد کنید.");
 
   const openai = new OpenAI({ apiKey: config.openaiApiKey });
 
@@ -64,13 +90,4 @@ async function callOpenAI(prompt: string, maxTokens: number, config: AIConfig): 
   });
 
   return response.choices[0]?.message?.content || "";
-}
-
-// Get current provider info for display
-export function getProviderInfo(): { provider: AIProvider; model: string; hasKey: boolean } {
-  const config = getConfig();
-  if (config.provider === "openai") {
-    return { provider: "openai", model: config.openaiModel || "gpt-4o", hasKey: !!config.openaiApiKey };
-  }
-  return { provider: "claude", model: config.claudeModel || "claude-sonnet-4-20250514", hasKey: !!config.claudeApiKey };
 }

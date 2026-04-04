@@ -243,6 +243,12 @@ model AdminUser {
   updatedAt DateTime @updatedAt
 }
 
+model AppSettings {
+  key       String   @id         // e.g. "ai_provider", "ai_model", "ai_key_claude"
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 model Notification {
   id        String   @id @default(cuid())
   type      String   // "price_change", "new_review", "system"
