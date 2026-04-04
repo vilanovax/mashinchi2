@@ -31,6 +31,7 @@ model Car {
   interactions UserInteraction[]
   reviews     CarReview[]
   prices      PriceHistory[]
+  sources     CarSource[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -241,6 +242,39 @@ model AdminUser {
   lastLogin DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model CarSource {
+  id              String   @id @default(cuid())
+  carId           String
+  car             Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  // Source info
+  type            String   // "comment", "article", "review", "manual"
+  sourceSite      String   // "bama", "divar", "zoomit", "charkhan", "blog", "manual"
+  url             String?  // link to original page
+  title           String?  // title of article/source
+
+  // Raw content
+  rawText         String   // raw text (crawled or pasted)
+
+  // AI-processed output
+  processedSummary    String?   // AI-generated summary
+  extractedPros       String[]  // extracted pros
+  extractedCons       String[]  // extracted cons
+  extractedIssues     String[]  // common issues found
+  extractedWarnings   String[]  // purchase warnings
+  extractedScores     String?   // JSON string: { comfort: 7, safety: 8, ... }
+
+  // Status
+  status          String   @default("pending") // "pending", "processed", "approved", "rejected"
+  appliedAt       DateTime? // when merged into review/intel
+  lastCrawledAt   DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([carId, status])
 }
 
 model AppSettings {
