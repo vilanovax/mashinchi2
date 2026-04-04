@@ -31,6 +31,8 @@ export default function RootLayout({
   return (
     <html lang="fa" dir="rtl" className="h-full" suppressHydrationWarning>
       <head>
+        <link rel="icon" href="/icon-192.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/icon-192.svg" />
         <link
           href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css"
           rel="stylesheet"
