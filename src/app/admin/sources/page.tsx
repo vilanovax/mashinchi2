@@ -52,9 +52,11 @@ export default function AdminSourcesPage() {
   const [addMode, setAddMode] = useState<AddMode>("url");
   const [crawlUrl, setCrawlUrl] = useState("");
   const [crawling, setCrawling] = useState(false);
+  const [crawlMode, setCrawlMode] = useState<"auto" | "browser">("auto");
+  const [crawlError, setCrawlError] = useState<{ error: string; suggestion?: string } | null>(null);
   const [crawlResult, setCrawlResult] = useState<{
     title: string; text: string; textLength: number;
-    sourceSite: string; type: string;
+    sourceSite: string; type: string; method: string;
     detectedCarId: string | null; detectedCarName: string;
   } | null>(null);
 
@@ -98,21 +100,22 @@ export default function AdminSourcesPage() {
     if (!crawlUrl.trim()) return;
     setCrawling(true);
     setCrawlResult(null);
+    setCrawlError(null);
     try {
       const res = await fetchAdmin("/api/admin/sources/crawl", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: crawlUrl }),
+        body: JSON.stringify({ url: crawlUrl, mode: crawlMode }),
       });
       const data = await res.json();
       if (data.success) {
         setCrawlResult(data);
         if (data.detectedCarId) setNewCarId(data.detectedCarId);
-        showToast(`استخراج شد: ${toPersianDigits(data.textLength)} کاراکتر`);
+        showToast(`استخراج شد: ${toPersianDigits(data.textLength)} کاراکتر (${data.method})`);
       } else {
-        showToast(data.error || "خطا در کرال");
+        setCrawlError({ error: data.error, suggestion: data.suggestion });
       }
-    } catch { showToast("خطا در اتصال"); }
+    } catch { setCrawlError({ error: "خطا در اتصال" }); }
     setCrawling(false);
   };
 
@@ -401,8 +404,8 @@ export default function AdminSourcesPage() {
                   <div className="flex gap-2">
                     <input
                       value={crawlUrl}
-                      onChange={(e) => setCrawlUrl(e.target.value)}
-                      placeholder="https://bama.ir/car/..."
+                      onChange={(e) => { setCrawlUrl(e.target.value); setCrawlError(null); }}
+                      placeholder="https://bama.ir/car-reviews/..."
                       dir="ltr"
                       className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-primary font-mono"
                     />
@@ -418,7 +421,48 @@ export default function AdminSourcesPage() {
                       )}
                     </button>
                   </div>
+
+                  {/* Crawl mode */}
+                  <div className="flex items-center gap-3 mt-2">
+                    <span className="text-[10px] text-muted">روش:</span>
+                    {([
+                      { key: "auto" as const, label: "خودکار", desc: "HTML اول، بعد Browser" },
+                      { key: "browser" as const, label: "مرورگر", desc: "برای lazy-load (کندتر)" },
+                    ]).map((m) => (
+                      <button
+                        key={m.key}
+                        onClick={() => setCrawlMode(m.key)}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-all ${
+                          crawlMode === m.key ? "bg-primary/10 text-primary border-primary/30 font-bold" : "border-border text-muted"
+                        }`}
+                        title={m.desc}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Crawl error */}
+                {crawlError && (
+                  <div className="bg-danger/5 border border-danger/15 rounded-xl p-3">
+                    <div className="flex items-start gap-2">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-danger shrink-0 mt-0.5"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>
+                      <div>
+                        <p className="text-[11px] text-danger font-bold">{crawlError.error}</p>
+                        {crawlError.suggestion && (
+                          <p className="text-[10px] text-muted mt-1">{crawlError.suggestion}</p>
+                        )}
+                        <button
+                          onClick={() => { setAddMode("text"); setCrawlError(null); }}
+                          className="text-[10px] text-primary font-bold mt-1.5 hover:underline"
+                        >
+                          رفتن به حالت متن دستی
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Crawl result */}
                 {crawlResult && (
@@ -428,6 +472,7 @@ export default function AdminSourcesPage() {
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-accent"><path d="M20 6L9 17l-5-5" /></svg>
                         <span className="text-xs font-bold text-accent">استخراج موفق</span>
                       </div>
+                      <span className="text-[9px] bg-background px-1.5 py-0.5 rounded">{crawlResult.method === "browser" ? "مرورگر" : "HTML"}</span>
                       <span className="text-[9px] text-muted">{toPersianDigits(crawlResult.textLength)} کاراکتر</span>
                     </div>
 
