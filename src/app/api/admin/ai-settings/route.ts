@@ -58,10 +58,10 @@ export async function POST(request: NextRequest) {
   try {
     const configOverride: Record<string, string> = { provider };
     if (provider === "openai") {
-      configOverride.openaiApiKey = apiKey;
+      if (apiKey) configOverride.openaiApiKey = apiKey;
       if (model) configOverride.openaiModel = model;
     } else {
-      configOverride.claudeApiKey = apiKey;
+      if (apiKey) configOverride.claudeApiKey = apiKey;
       if (model) configOverride.claudeModel = model;
     }
 

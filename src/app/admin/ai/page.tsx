@@ -14,8 +14,8 @@ interface AISettings {
   openaiKey: string | null;
   claudeModel: string;
   openaiModel: string;
-  availableClaudeModels: string[];
-  availableOpenaiModels: string[];
+  availableClaudeModels: { id: string; name: string; desc: string }[];
+  availableOpenaiModels: { id: string; name: string; desc: string }[];
 }
 
 export default function AdminAIPage() {
@@ -188,7 +188,7 @@ export default function AdminAIPage() {
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm outline-none"
             >
               {availableModels.map((m) => (
-                <option key={m} value={m}>{m}</option>
+                <option key={m.id} value={m.id}>{m.name} - {m.desc}</option>
               ))}
             </select>
           </div>
