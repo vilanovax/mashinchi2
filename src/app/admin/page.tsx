@@ -18,14 +18,25 @@ export default function AdminDashboard() {
   const { fetchAdmin } = useAdmin();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
-  useEffect(() => {
+  const loadStats = () => {
     fetchAdmin("/api/admin/stats")
       .then((r) => r.json())
-      .then((data) => { setStats(data); setLoading(false); })
+      .then((data) => { setStats(data); setLoading(false); setLastRefresh(new Date()); })
       .catch(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadStats();
+    // Auto-refresh every 60 seconds
+    if (autoRefresh) {
+      const interval = setInterval(loadStats, 60000);
+      return () => clearInterval(interval);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [autoRefresh]);
 
   if (loading) {
     return (
@@ -49,7 +60,27 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-6">
-      <h1 className="text-xl font-black mb-6">داشبورد</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-xl font-black">داشبورد</h1>
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] text-muted">
+            آخرین بروزرسانی: {lastRefresh.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" })}
+          </span>
+          <button
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`text-[10px] px-2 py-1 rounded-lg font-bold transition-colors ${
+              autoRefresh ? "bg-accent/10 text-accent" : "bg-background text-muted"
+            }`}
+          >
+            {autoRefresh ? "خودکار" : "دستی"}
+          </button>
+          <button onClick={loadStats} className="p-1 text-muted hover:text-primary transition-colors">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+            </svg>
+          </button>
+        </div>
+      </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-5 gap-3 mb-8">

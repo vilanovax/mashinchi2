@@ -225,7 +225,32 @@ model AuditLog {
   entity    String   // "car", "review", "crawler", "price", "settings"
   entityId  String?  // ID of the affected record
   details   String   // JSON string with change details
+  adminId   String?  // who performed the action
   createdAt DateTime @default(now())
 
   @@index([entity, createdAt])
+}
+
+model AdminUser {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String   // hashed
+  name      String   // display name
+  role      String   @default("editor") // "super_admin", "editor", "viewer"
+  isActive  Boolean  @default(true)
+  lastLogin DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      String   // "price_change", "new_review", "system"
+  title     String
+  message   String
+  entityId  String?  // related car/review ID
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([isRead, createdAt])
 }

@@ -5,11 +5,15 @@ import { usePathname, useRouter } from "next/navigation";
 
 interface AdminContextType {
   token: string;
+  role: string;
+  name: string;
   fetchAdmin: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
-const AdminContext = createContext<AdminContextType>({ token: "", fetchAdmin: () => Promise.reject() });
+const AdminContext = createContext<AdminContextType>({ token: "", role: "viewer", name: "", fetchAdmin: () => Promise.reject() });
 export const useAdmin = () => useContext(AdminContext);
+
+const ROLE_LABELS: Record<string, string> = { super_admin: "مدیر ارشد", editor: "ویرایشگر", viewer: "مشاهده‌کننده" };
 
 const NAV_ITEMS = [
   { path: "/admin", label: "داشبورد", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" },
@@ -23,13 +27,18 @@ const NAV_ITEMS = [
   { path: "/admin/analytics", label: "تحلیل", icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
   { path: "/admin/import", label: "واردات", icon: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" },
   { path: "/admin/audit", label: "لاگ", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+  { path: "/admin/team", label: "تیم", icon: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75", superOnly: true },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
+  const [adminRole, setAdminRole] = useState("viewer");
+  const [adminName, setAdminName] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -41,15 +50,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const handleLogin = async () => {
     setError("");
+    // Try username:password format first, then plain password
+    const loginToken = username ? `${username}:${password}` : password;
     try {
       const res = await fetch("/api/admin/stats", {
-        headers: { Authorization: `Bearer ${password}` },
+        headers: { Authorization: `Bearer ${loginToken}` },
       });
       if (res.ok) {
-        setToken(password);
-        localStorage.setItem("mashinchi-admin-token", password);
+        setToken(loginToken);
+        setAdminRole("super_admin");
+        setAdminName(username || "Admin");
+        localStorage.setItem("mashinchi-admin-token", loginToken);
       } else {
-        setError("رمز عبور اشتباه است");
+        setError("اطلاعات ورود اشتباه است");
       }
     } catch {
       setError("خطا در اتصال");
@@ -67,6 +80,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       headers: { ...options.headers as Record<string, string>, Authorization: `Bearer ${token}` },
     });
   };
+
+  // Load notification count
+  useEffect(() => {
+    if (!token) return;
+    const loadNotifs = () => {
+      fetch("/api/admin/notifications?unread=true", { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((d) => { if (Array.isArray(d)) setUnreadCount(d.length); })
+        .catch(() => {});
+    };
+    loadNotifs();
+    const interval = setInterval(loadNotifs, 30000); // refresh every 30s
+    return () => clearInterval(interval);
+  }, [token]);
 
   if (loading) {
     return (
@@ -92,6 +119,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <p className="text-xs text-muted mt-1">رمز عبور را وارد کنید</p>
           </div>
           <input
+            type="text"
+            placeholder="نام کاربری (اختیاری)"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary mb-2"
+          />
+          <input
             type="password"
             placeholder="رمز عبور"
             value={password}
@@ -112,7 +146,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <AdminContext.Provider value={{ token, fetchAdmin }}>
+    <AdminContext.Provider value={{ token, role: adminRole, name: adminName, fetchAdmin }}>
       <div className="min-h-screen bg-background flex" dir="rtl">
         {/* Sidebar */}
         <aside className="w-56 bg-surface border-l border-border shrink-0 flex flex-col">
@@ -120,28 +154,43 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <h1 className="text-sm font-black text-primary">ماشینچی</h1>
             <p className="text-[10px] text-muted">پنل مدیریت</p>
           </div>
-          <nav className="flex-1 p-2 space-y-1">
-            {NAV_ITEMS.map((item) => {
-              const isActive = pathname === item.path;
-              return (
-                <button
-                  key={item.path}
-                  onClick={() => router.push(item.path)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-colors ${
-                    isActive ? "bg-primary/10 text-primary" : "text-muted hover:text-foreground hover:bg-background"
-                  }`}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d={item.icon} />
-                  </svg>
-                  {item.label}
-                </button>
-              );
-            })}
+          <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+            {NAV_ITEMS
+              .filter((item) => !("superOnly" in item && item.superOnly) || adminRole === "super_admin")
+              .map((item) => {
+                const isActive = pathname === item.path || (item.path !== "/admin" && pathname.startsWith(item.path));
+                return (
+                  <button
+                    key={item.path}
+                    onClick={() => router.push(item.path)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
+                      isActive ? "bg-primary/10 text-primary" : "text-muted hover:text-foreground hover:bg-background"
+                    }`}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d={item.icon} />
+                    </svg>
+                    {item.label}
+                  </button>
+                );
+              })}
           </nav>
-          <div className="p-3 border-t border-border">
-            <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-danger hover:bg-danger/5 transition-colors">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+
+          {/* User info + logout */}
+          <div className="p-3 border-t border-border space-y-2">
+            <div className="flex items-center gap-2 px-2">
+              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <div className="text-[11px] font-bold truncate">{adminName || "Admin"}</div>
+                <div className="text-[9px] text-muted">{ROLE_LABELS[adminRole] || adminRole}</div>
+              </div>
+            </div>
+            <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] text-danger hover:bg-danger/5 transition-colors">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
               </svg>
               خروج
@@ -151,6 +200,47 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto">
+          {/* Top bar with notification bell */}
+          <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border/50 px-6 py-2 flex items-center justify-between">
+            <div />
+            <div className="flex items-center gap-3">
+              {/* Export button */}
+              <div className="relative group">
+                <button className="p-1.5 rounded-lg text-muted hover:text-foreground hover:bg-surface transition-colors">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                  </svg>
+                </button>
+                <div className="absolute left-0 top-full mt-1 bg-surface border border-border rounded-lg shadow-xl hidden group-hover:block min-w-[120px] z-20">
+                  {["cars", "users", "reviews"].map((t) => (
+                    <a
+                      key={t}
+                      href={`/api/admin/export?type=${t}`}
+                      onClick={(e) => { e.preventDefault(); fetchAdmin(`/api/admin/export?type=${t}`).then(r => r.blob()).then(b => { const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = `mashinchi-${t}.csv`; a.click(); }); }}
+                      className="block px-3 py-2 text-[11px] text-muted hover:text-foreground hover:bg-background transition-colors"
+                    >
+                      {t === "cars" ? "خودروها" : t === "users" ? "کاربران" : "نظرات"} CSV
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              {/* Notification bell */}
+              <button
+                onClick={() => router.push("/admin/audit")}
+                className="p-1.5 rounded-lg text-muted hover:text-foreground hover:bg-surface transition-colors relative"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-danger text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                    {unreadCount > 9 ? "+" : unreadCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
           {children}
         </main>
       </div>
