@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyAdmin, unauthorizedResponse } from "@/lib/adminAuth";
-import { callAI, getProviderInfo } from "@/lib/ai-provider";
+import { callAI } from "@/lib/ai-provider";
 
 export async function POST(request: NextRequest) {
   const _s = await verifyAdmin(request); if (!_s) return unauthorizedResponse();
@@ -74,19 +74,12 @@ ${carInfo}
   }
 
   try {
-    // Use runtime config override if provided
-    const configOverride: Record<string, string> = {};
-    const runtimeProvider = request.headers.get("x-ai-provider");
-    const runtimeKey = request.headers.get("x-ai-key");
-    if (runtimeProvider) configOverride.provider = runtimeProvider;
-    if (runtimeKey && runtimeProvider === "openai") configOverride.openaiApiKey = runtimeKey;
-    if (runtimeKey && runtimeProvider === "claude") configOverride.claudeApiKey = runtimeKey;
-
-    const text = await callAI(prompt, 1500, configOverride);
-    const providerInfo = getProviderInfo();
+    // Uses DB/env config from ai-provider (no runtime override)
+    const text = await callAI(prompt, 1500);
+    const provider = process.env.AI_PROVIDER || "claude";
 
     if (type === "description") {
-      return NextResponse.json({ result: text.trim(), type: "description", provider: providerInfo.provider });
+      return NextResponse.json({ result: text.trim(), type: "description", provider });
     }
 
     // Parse JSON from response
@@ -96,7 +89,7 @@ ${carInfo}
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
-    return NextResponse.json({ result: parsed, type, provider: providerInfo.provider });
+    return NextResponse.json({ result: parsed, type, provider });
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error("AI generation error:", errMsg);
