@@ -2,6 +2,7 @@
 
 import { useState, useEffect, createContext, useContext } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useTheme } from "@/components/ThemeProvider";
 
 interface AdminContextType {
   token: string;
@@ -29,6 +30,82 @@ const NAV_ITEMS = [
   { path: "/admin/audit", label: "لاگ", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
   { path: "/admin/team", label: "تیم", icon: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75", superOnly: true },
 ];
+
+function SidebarFooter({ adminName, adminRole, roleLabels, onLogout }: {
+  adminName: string; adminRole: string; roleLabels: Record<string, string>; onLogout: () => void;
+}) {
+  const { theme, setTheme } = useTheme();
+  const [showSettings, setShowSettings] = useState(false);
+
+  return (
+    <div className="border-t border-border">
+      {/* Settings Toggle */}
+      <button
+        onClick={() => setShowSettings(!showSettings)}
+        className="w-full flex items-center gap-2 px-5 py-2.5 text-[11px] text-muted hover:text-foreground hover:bg-background transition-colors"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+        </svg>
+        تنظیمات
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={`mr-auto transition-transform ${showSettings ? "rotate-180" : ""}`}>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <div className="px-3 pb-3">
+          <div className="bg-background rounded-xl p-2">
+            <div className="text-[10px] text-muted px-2 mb-1.5">حالت نمایش</div>
+            <div className="flex gap-0.5 bg-border/30 rounded-lg p-0.5">
+              {([
+                { key: "light" as const, label: "روشن", icon: <><circle cx="12" cy="12" r="5" /><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" /></> },
+                { key: "dark" as const, label: "تاریک", icon: <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" /> },
+                { key: "system" as const, label: "سیستم", icon: <><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></> },
+              ]).map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => setTheme(opt.key)}
+                  className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md text-[10px] font-bold transition-all ${
+                    theme === opt.key
+                      ? "bg-surface text-foreground shadow-sm"
+                      : "text-muted hover:text-foreground"
+                  }`}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">{opt.icon}</svg>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User info */}
+      <div className="p-3 pt-0 space-y-2">
+        <div className="flex items-center gap-2 px-2">
+          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <div className="text-[11px] font-bold truncate">{adminName || "Admin"}</div>
+            <div className="text-[9px] text-muted">{roleLabels[adminRole] || adminRole}</div>
+          </div>
+        </div>
+        <button onClick={onLogout} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] text-danger hover:bg-danger/5 transition-colors">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+          </svg>
+          خروج
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
@@ -176,26 +253,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               })}
           </nav>
 
-          {/* User info + logout */}
-          <div className="p-3 border-t border-border space-y-2">
-            <div className="flex items-center gap-2 px-2">
-              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
-                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
-                </svg>
-              </div>
-              <div className="min-w-0">
-                <div className="text-[11px] font-bold truncate">{adminName || "Admin"}</div>
-                <div className="text-[9px] text-muted">{ROLE_LABELS[adminRole] || adminRole}</div>
-              </div>
-            </div>
-            <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] text-danger hover:bg-danger/5 transition-colors">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
-              </svg>
-              خروج
-            </button>
-          </div>
+          {/* Settings + User info + logout */}
+          <SidebarFooter
+            adminName={adminName}
+            adminRole={adminRole}
+            roleLabels={ROLE_LABELS}
+            onLogout={handleLogout}
+          />
         </aside>
 
         {/* Main Content */}
