@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { formatPrice, toPersianDigits, getOriginLabel, getCategoryLabel } from "@/lib/utils";
 import BottomSheet from "@/components/BottomSheet";
+import { useCompare } from "@/lib/useCompare";
 
 interface Car {
   id: string;
@@ -23,7 +24,16 @@ interface Car {
     fuelType: string | null;
     fuelConsumption: number | null;
   } | null;
+  intel: { ownerSatisfaction: number; purchaseRisk: number } | null;
 }
+
+const ORIGIN_COLORS: Record<string, string> = {
+  iranian: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  chinese: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+  korean: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  japanese: "bg-red-500/10 text-red-600 dark:text-red-400",
+  european: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+};
 
 interface CarDetail {
   id: string;
@@ -101,6 +111,8 @@ export default function CatalogPage() {
   const [selectedCar, setSelectedCar] = useState<CarDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [compareMode, setCompareMode] = useState(false);
+  const { compareIds, toggleCompare, isInCompare, canCompare, goToCompare, count: compareCount, clearCompare } = useCompare();
 
   useEffect(() => {
     fetch("/api/cars")
@@ -195,14 +207,31 @@ export default function CatalogPage() {
     );
   }
 
+  // Get top traits for a car
+  const getTopTraits = (car: Car): string[] => {
+    if (!car.scores) return [];
+    const traits: { label: string; value: number }[] = [
+      { label: "راحت", value: car.scores.comfort || 0 },
+      { label: "قدرتمند", value: car.scores.performance || 0 },
+      { label: "اقتصادی", value: car.scores.economy || 0 },
+      { label: "امن", value: car.scores.safety || 0 },
+      { label: "باکلاس", value: car.scores.prestige || 0 },
+      { label: "خانوادگی", value: car.scores.familyFriendly || 0 },
+    ];
+    return traits.sort((a, b) => b.value - a.value).slice(0, 2).map((t) => t.label);
+  };
+
   return (
     <div className="flex-1 flex flex-col page-transition">
       {/* Header */}
-      <div className="px-5 pt-4 pb-2">
-        <h1 className="text-lg font-black mb-3">کاتالوگ خودرو</h1>
+      <div className="px-5 pt-4 pb-1">
+        <div className="flex items-center justify-between mb-2.5">
+          <h1 className="text-lg font-black">کاتالوگ خودرو</h1>
+          <span className="text-[11px] text-muted">{toPersianDigits(filtered.length)} خودرو</span>
+        </div>
 
         {/* Search */}
-        <div className="relative mb-3">
+        <div className="relative mb-2.5">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted">
             <circle cx="11" cy="11" r="8" />
             <path d="M21 21l-4.35-4.35" />
@@ -212,119 +241,180 @@ export default function CatalogPage() {
             placeholder="جستجو نام یا برند..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-background border border-border rounded-xl pr-10 pl-4 py-2.5 text-sm outline-none focus:border-primary transition-colors"
+            className="w-full bg-background border border-border rounded-xl pr-10 pl-4 py-2 text-sm outline-none focus:border-primary transition-colors"
           />
         </div>
 
-        {/* Origin Filter */}
-        <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1 no-scrollbar">
+        {/* Single-line filters: Origin + Category + Sort */}
+        <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1">
           {ORIGINS.map((o) => (
             <button
               key={o.key}
               onClick={() => setOriginFilter(o.key)}
-              className={`shrink-0 text-[11px] px-3 py-1 rounded-full font-bold transition-colors ${
+              className={`shrink-0 text-[10px] px-2.5 py-1 rounded-full font-bold transition-colors ${
                 originFilter === o.key
                   ? "bg-primary text-white"
-                  : "bg-background text-muted hover:text-foreground"
+                  : "bg-background text-muted"
               }`}
             >
               {o.label}
             </button>
           ))}
+          <div className="w-px bg-border shrink-0 mx-0.5" />
+          {CATEGORIES.filter(c => c.key !== "all").map((c) => (
+            <button
+              key={c.key}
+              onClick={() => setCategoryFilter(prev => prev === c.key ? "all" : c.key)}
+              className={`shrink-0 text-[10px] px-2.5 py-1 rounded-full font-bold transition-colors ${
+                categoryFilter === c.key
+                  ? "bg-accent text-white"
+                  : "bg-background text-muted"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+          <div className="w-px bg-border shrink-0 mx-0.5" />
+          {SORT_OPTIONS.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setSortBy(s.key)}
+              className={`shrink-0 text-[10px] px-2.5 py-1 rounded-full font-bold transition-colors ${
+                sortBy === s.key
+                  ? "bg-foreground text-background"
+                  : "bg-background text-muted"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
-
-        {/* Category + Sort Row */}
-        <div className="flex items-center justify-between mt-1">
-          <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
-            {CATEGORIES.map((c) => (
-              <button
-                key={c.key}
-                onClick={() => setCategoryFilter(c.key)}
-                className={`shrink-0 text-[11px] px-2.5 py-0.5 rounded-full transition-colors ${
-                  categoryFilter === c.key
-                    ? "bg-accent/15 text-accent font-bold"
-                    : "text-muted hover:text-foreground"
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="text-[11px] bg-background border border-border rounded-lg px-2 py-1 text-muted outline-none shrink-0 mr-2"
-          >
-            {SORT_OPTIONS.map((s) => (
-              <option key={s.key} value={s.key}>{s.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Results count */}
-      <div className="px-5 py-1.5">
-        <span className="text-[11px] text-muted">{toPersianDigits(filtered.length)} خودرو</span>
       </div>
 
       {/* Car List */}
-      <div className="flex-1 overflow-y-auto px-5 pb-4">
-        <div className="space-y-2.5">
-          {filtered.map((car) => (
-            <div
-              key={car.id}
-              onClick={() => openCarDetail(car.id)}
-              className="w-full bg-surface rounded-2xl border border-border p-3.5 text-right flex items-center gap-3 active:scale-[0.99] transition-transform cursor-pointer"
-            >
-              {/* Car mini icon */}
-              <div className="w-12 h-12 rounded-xl bg-background flex items-center justify-center shrink-0">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted/50">
-                  <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-                  <path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-                  <path d="M5 17H3v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2" />
-                  <path d="M9 17h6" />
-                </svg>
-              </div>
+      <div className="flex-1 overflow-y-auto px-5 pb-4 pt-2">
+        <div className="space-y-2">
+          {filtered.map((car) => {
+            const satisfaction = car.intel?.ownerSatisfaction;
+            const originColor = ORIGIN_COLORS[car.origin] || "bg-muted/10 text-muted";
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold truncate">{car.nameFa}</h3>
-                  <button
-                    onClick={(e) => toggleFavorite(car.id, e)}
-                    className="shrink-0 mr-1 p-1"
-                  >
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill={favoriteIds.has(car.id) ? "currentColor" : "none"}
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className={favoriteIds.has(car.id) ? "text-danger" : "text-muted"}
-                    >
-                      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7z" />
-                    </svg>
-                  </button>
-                </div>
-                <p className="text-[11px] text-muted">
-                  {car.brandFa} | {getOriginLabel(car.origin)} | {getCategoryLabel(car.category)}
-                </p>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-xs font-bold text-primary">
-                    {toPersianDigits(formatPrice(car.priceMin))}
-                    <span className="text-[10px] text-muted font-normal"> تا </span>
-                    {toPersianDigits(formatPrice(car.priceMax))}
-                  </span>
-                  {car.specs?.horsepower && (
-                    <span className="text-[10px] text-muted">
-                      {toPersianDigits(car.specs.horsepower)} اسب
-                    </span>
+            return (
+              <div
+                key={car.id}
+                onClick={() => compareMode ? toggleCompare(car.id) : openCarDetail(car.id)}
+                className={`bg-surface rounded-2xl border overflow-hidden active:scale-[0.99] transition-all cursor-pointer ${
+                  compareMode && isInCompare(car.id)
+                    ? "border-primary ring-2 ring-primary/20"
+                    : "border-border"
+                }`}
+              >
+                <div className="flex items-stretch relative">
+                  {/* Compare checkbox overlay */}
+                  {compareMode && (
+                    <div className={`absolute top-2 left-2 z-10 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                      isInCompare(car.id) ? "bg-primary border-primary" : "bg-white/80 dark:bg-black/50 border-border"
+                    }`}>
+                      {isInCompare(car.id) && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                          <path d="M20 6L9 17l-5-5" />
+                        </svg>
+                      )}
+                    </div>
                   )}
+
+                  {/* Left: Satisfaction Score */}
+                  <div className={`w-14 shrink-0 flex flex-col items-center justify-center ${
+                    satisfaction && satisfaction >= 7 ? "bg-accent/8" :
+                    satisfaction && satisfaction >= 5 ? "bg-primary/8" : "bg-background"
+                  }`}>
+                    {satisfaction ? (
+                      <>
+                        <span className={`text-base font-black ${
+                          satisfaction >= 7 ? "text-accent" :
+                          satisfaction >= 5 ? "text-primary" : "text-muted"
+                        }`}>{toPersianDigits(satisfaction)}</span>
+                        <span className="text-[8px] text-muted">رضایت</span>
+                      </>
+                    ) : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted/30">
+                        <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                        <path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                        <path d="M5 17H3v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2" />
+                        <path d="M9 17h6" />
+                      </svg>
+                    )}
+                  </div>
+
+                  {/* Right: Info */}
+                  <div className="flex-1 p-3 min-w-0">
+                    {/* Row 1: Name + Favorite */}
+                    <div className="flex items-center justify-between mb-0.5">
+                      <h3 className="text-sm font-black truncate">{car.nameFa}</h3>
+                      <button
+                        onClick={(e) => toggleFavorite(car.id, e)}
+                        className="shrink-0 mr-1 p-1 -m-1"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24"
+                          fill={favoriteIds.has(car.id) ? "currentColor" : "none"}
+                          stroke="currentColor" strokeWidth="2"
+                          className={favoriteIds.has(car.id) ? "text-danger" : "text-muted/40"}
+                        >
+                          <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7z" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {/* Row 2: Brand + Origin badge */}
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <span className="text-[11px] text-muted">{car.brandFa}</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${originColor}`}>
+                        {getOriginLabel(car.origin)}
+                      </span>
+                      <span className="text-[9px] bg-background text-muted px-1.5 py-0.5 rounded-full">
+                        {getCategoryLabel(car.category)}
+                      </span>
+                    </div>
+
+                    {/* Row 3: Price + Specs */}
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-bold text-primary">
+                        {toPersianDigits(formatPrice(car.priceMin))}
+                        <span className="text-[9px] text-muted font-normal mx-0.5">~</span>
+                        {toPersianDigits(formatPrice(car.priceMax))}
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] text-muted">
+                        {car.specs?.horsepower && (
+                          <span>{toPersianDigits(car.specs.horsepower)} hp</span>
+                        )}
+                        {car.specs?.transmission && (
+                          <span>{car.specs.transmission === "automatic" ? "AT" : car.specs.transmission === "manual" ? "MT" : car.specs.transmission}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Row 4: Traits */}
+                    {getTopTraits(car).length > 0 && (
+                      <div className="flex gap-1 mt-1.5">
+                        {getTopTraits(car).map((trait) => (
+                          <span key={trait} className="text-[9px] font-bold bg-accent/8 text-accent px-2 py-0.5 rounded-full">
+                            {trait}
+                          </span>
+                        ))}
+                        {car.tags
+                          .filter(t => !getTopTraits(car).includes(t) && t !== getCategoryLabel(car.category))
+                          .slice(0, 1)
+                          .map((tag) => (
+                            <span key={tag} className="text-[9px] bg-background text-muted px-2 py-0.5 rounded-full">
+                              {tag}
+                            </span>
+                          ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {filtered.length === 0 && (
@@ -332,6 +422,46 @@ export default function CatalogPage() {
             <p className="text-muted text-sm">خودرویی پیدا نشد</p>
           </div>
         )}
+      </div>
+
+      {/* Floating Compare Button */}
+      <div className="sticky bottom-14 px-5 pb-2 pt-1 z-20">
+        <div className="max-w-md mx-auto">
+          {compareMode ? (
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setCompareMode(false); clearCompare(); }}
+                className="py-2.5 px-4 bg-surface border border-border text-foreground text-xs font-bold rounded-xl"
+              >
+                انصراف
+              </button>
+              <button
+                onClick={goToCompare}
+                disabled={!canCompare}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                  canCompare
+                    ? "bg-primary text-white shadow-lg shadow-primary/25 active:scale-[0.97]"
+                    : "bg-primary/20 text-primary/50"
+                }`}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4" />
+                </svg>
+                {canCompare ? "مقایسه کن" : `${toPersianDigits(compareCount)} از ۲ انتخاب شده`}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setCompareMode(true)}
+              className="w-full py-2.5 bg-surface border border-border rounded-xl text-xs font-bold text-muted flex items-center justify-center gap-2 hover:text-foreground transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4" />
+              </svg>
+              مقایسه دو خودرو
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Bottom Sheet - Car Detail */}
@@ -357,22 +487,38 @@ export default function CatalogPage() {
                   <span className="text-sm font-bold text-primary">{toPersianDigits(formatPrice(selectedCar.priceMax))}</span>
                 </div>
               </div>
-              <button
-                onClick={() => toggleFavorite(selectedCar.id)}
-                className="w-10 h-10 rounded-full bg-background flex items-center justify-center"
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill={favoriteIds.has(selectedCar.id) ? "currentColor" : "none"}
-                  stroke="currentColor"
-                  strokeWidth="2"
+              <div className="flex items-center gap-1.5">
+                {/* Compare button */}
+                <button
+                  onClick={() => { toggleCompare(selectedCar.id); }}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+                    isInCompare(selectedCar.id) ? "bg-primary/15" : "bg-background"
+                  }`}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    className={isInCompare(selectedCar.id) ? "text-primary" : "text-muted"}
+                  >
+                    <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4" />
+                  </svg>
+                </button>
+                {/* Favorite button */}
+                <button
+                  onClick={() => toggleFavorite(selectedCar.id)}
+                  className="w-9 h-9 rounded-full bg-background flex items-center justify-center"
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill={favoriteIds.has(selectedCar.id) ? "currentColor" : "none"}
+                    stroke="currentColor"
+                    strokeWidth="2"
                   className={favoriteIds.has(selectedCar.id) ? "text-danger" : "text-muted"}
                 >
                   <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7z" />
                 </svg>
-              </button>
+                </button>
+              </div>
             </div>
 
             {/* Quick Stats */}

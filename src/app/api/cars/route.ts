@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
       specs: true,
       tags: true,
       reviews: true,
+      intel: true,
     },
     orderBy: { createdAt: "asc" },
   });
@@ -42,6 +43,10 @@ export async function GET(request: NextRequest) {
       warnings: r.warnings,
       rating: r.rating,
     })),
+    intel: car.intel ? {
+      ownerSatisfaction: car.intel.ownerSatisfaction,
+      purchaseRisk: car.intel.purchaseRisk,
+    } : null,
   }));
 
   return NextResponse.json(serialized);

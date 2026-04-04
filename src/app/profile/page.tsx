@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatPrice, toPersianDigits, getOriginLabel, getCategoryLabel } from "@/lib/utils";
 import { useTheme } from "@/components/ThemeProvider";
 import BottomSheet from "@/components/BottomSheet";
+import { useCompare } from "@/lib/useCompare";
 
 interface FavoriteCar {
   id: string;
@@ -64,6 +65,11 @@ export default function ProfilePage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedCar, setSelectedCar] = useState<CarDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [favExpanded, setFavExpanded] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [favCompareMode, setFavCompareMode] = useState(false);
+  const { toggleCompare, isInCompare, canCompare, goToCompare, count: compareCount, clearCompare } = useCompare();
 
   useEffect(() => {
     Promise.all([
@@ -89,12 +95,17 @@ export default function ProfilePage() {
   };
 
   const removeFavorite = async (carId: string) => {
+    const carName = favorites.find((f) => f.id === carId)?.nameFa || "";
     await fetch("/api/favorites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ carId }),
     });
     setFavorites((prev) => prev.filter((f) => f.id !== carId));
+    setConfirmDelete(null);
+    // Show toast
+    setToast(`${carName} از نشان‌شده‌ها حذف شد`);
+    setTimeout(() => setToast(null), 2500);
   };
 
   const handleReset = async () => {
@@ -273,95 +284,242 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Favorites Section */}
+        {/* Favorites Section - Accordion */}
         <div className="px-5 mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-black flex items-center gap-1.5">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-danger">
-                <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
-              </svg>
-              نشان‌شده‌ها
-            </h2>
-            {favorites.length > 0 && (
-              <button
-                onClick={() => router.push("/catalog")}
-                className="text-[11px] text-primary font-bold"
-              >
-                + افزودن
-              </button>
-            )}
-          </div>
-
           {favorites.length === 0 ? (
-            <div className="bg-surface rounded-xl border border-dashed border-border p-5 text-center">
-              <div className="w-12 h-12 mx-auto mb-2 bg-muted/8 rounded-full flex items-center justify-center">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted/50">
+            <>
+              <h2 className="text-sm font-black flex items-center gap-1.5 mb-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-danger">
                   <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
                 </svg>
-              </div>
-              <p className="text-xs text-muted mb-2">خودرویی نشان نشده</p>
-              <button
-                onClick={() => router.push("/catalog")}
-                className="text-[11px] text-primary font-bold bg-primary/8 px-4 py-1.5 rounded-lg"
-              >
-                رفتن به کاتالوگ
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {favorites.map((car) => (
-                <div
-                  key={car.id}
-                  className="bg-surface rounded-xl border border-border overflow-hidden"
+                نشان‌شده‌ها
+              </h2>
+              <div className="bg-surface rounded-xl border border-dashed border-border p-5 text-center">
+                <div className="w-12 h-12 mx-auto mb-2 bg-muted/8 rounded-full flex items-center justify-center">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted/50">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
+                  </svg>
+                </div>
+                <p className="text-xs text-muted mb-2">خودرویی نشان نشده</p>
+                <button
+                  onClick={() => router.push("/catalog")}
+                  className="text-[11px] text-primary font-bold bg-primary/8 px-4 py-1.5 rounded-lg"
                 >
-                  <button
-                    onClick={() => openCarDetail(car.id)}
-                    className="w-full p-3 text-right flex items-center gap-3"
-                  >
-                    {/* Colored dot based on satisfaction */}
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                      car.intel && car.intel.ownerSatisfaction >= 7 ? "bg-accent/10" :
-                      car.intel && car.intel.ownerSatisfaction >= 5 ? "bg-primary/10" : "bg-background"
-                    }`}>
-                      {car.intel ? (
-                        <span className={`text-sm font-black ${
-                          car.intel.ownerSatisfaction >= 7 ? "text-accent" :
-                          car.intel.ownerSatisfaction >= 5 ? "text-primary" : "text-muted"
-                        }`}>{toPersianDigits(car.intel.ownerSatisfaction)}</span>
-                      ) : (
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted/40">
-                          <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-                          <path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-                          <path d="M5 17H3v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2" />
-                          <path d="M9 17h6" />
-                        </svg>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold truncate">{car.nameFa}</h3>
-                        <span className="text-xs font-bold text-primary shrink-0 mr-2">{toPersianDigits(formatPrice(car.priceMin))}</span>
-                      </div>
-                      <p className="text-[11px] text-muted">{car.brandFa} | {getOriginLabel(car.origin)} | {getCategoryLabel(car.category)}</p>
-                    </div>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted shrink-0">
-                      <path d="M9 18l6-6-6-6" />
-                    </svg>
-                  </button>
-                  {/* Swipe to delete hint */}
-                  <div className="px-3 pb-2 flex justify-end">
+                  رفتن به کاتالوگ
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="bg-surface rounded-2xl border border-border overflow-hidden">
+              {/* Accordion Header */}
+              <div
+                onClick={() => setFavExpanded(!favExpanded)}
+                className="w-full px-4 py-3 flex items-center justify-between cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-danger">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
+                  </svg>
+                  <span className="text-sm font-black">نشان‌شده‌ها</span>
+                  <span className="text-[10px] bg-danger/10 text-danger font-bold px-2 py-0.5 rounded-full">
+                    {toPersianDigits(favorites.length)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {favorites.length >= 2 && (
                     <button
-                      onClick={() => removeFavorite(car.id)}
-                      className="text-[10px] text-danger/60 hover:text-danger transition-colors"
+                      onClick={(e) => { e.stopPropagation(); setFavCompareMode(!favCompareMode); setFavExpanded(true); if (favCompareMode) clearCompare(); }}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors ${
+                        favCompareMode ? "bg-primary text-white" : "text-muted hover:text-primary"
+                      }`}
                     >
-                      حذف از نشان‌شده‌ها
+                      {favCompareMode ? "لغو مقایسه" : "مقایسه"}
                     </button>
+                  )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); router.push("/catalog"); }}
+                    className="text-[10px] text-primary font-bold"
+                  >
+                    + افزودن
+                  </button>
+                  <svg
+                    width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    className={`text-muted transition-transform duration-200 ${favExpanded ? "rotate-180" : ""}`}
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Preview (always show first 3) */}
+              {!favExpanded && (
+                <div className="px-4 pb-3">
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                    {favorites.slice(0, 4).map((car) => (
+                      <button
+                        key={car.id}
+                        onClick={() => openCarDetail(car.id)}
+                        className="shrink-0 bg-background rounded-xl px-3 py-2 min-w-[110px] text-right"
+                      >
+                        <div className="text-[11px] font-bold truncate">{car.nameFa}</div>
+                        <div className="text-[9px] text-muted">{car.brandFa}</div>
+                        <div className="text-[10px] text-primary font-bold mt-0.5">{toPersianDigits(formatPrice(car.priceMin))}</div>
+                      </button>
+                    ))}
+                    {favorites.length > 4 && (
+                      <button
+                        onClick={() => setFavExpanded(true)}
+                        className="shrink-0 bg-primary/8 rounded-xl px-3 py-2 min-w-[80px] flex items-center justify-center"
+                      >
+                        <span className="text-[11px] text-primary font-bold">
+                          +{toPersianDigits(favorites.length - 4)} دیگر
+                        </span>
+                      </button>
+                    )}
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* Expanded List */}
+              {favExpanded && (
+                <div className="border-t border-border">
+                  {favorites.map((car, index) => (
+                    <div
+                      key={car.id}
+                      onClick={favCompareMode ? () => toggleCompare(car.id) : undefined}
+                      className={`flex items-center gap-3 px-4 py-2.5 ${
+                        index < favorites.length - 1 ? "border-b border-border/50" : ""
+                      } ${favCompareMode ? "cursor-pointer" : ""} ${
+                        favCompareMode && isInCompare(car.id) ? "bg-primary/5" : ""
+                      }`}
+                    >
+                      {/* Compare checkbox OR Satisfaction */}
+                      {favCompareMode ? (
+                        <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                          isInCompare(car.id) ? "bg-primary border-primary" : "border-border"
+                        }`}>
+                          {isInCompare(car.id) && (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                              <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                          )}
+                        </div>
+                      ) : (
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                          car.intel && car.intel.ownerSatisfaction >= 7 ? "bg-accent/10" :
+                          car.intel && car.intel.ownerSatisfaction >= 5 ? "bg-primary/10" : "bg-background"
+                        }`}>
+                          {car.intel ? (
+                            <span className={`text-xs font-black ${
+                              car.intel.ownerSatisfaction >= 7 ? "text-accent" :
+                              car.intel.ownerSatisfaction >= 5 ? "text-primary" : "text-muted"
+                            }`}>{toPersianDigits(car.intel.ownerSatisfaction)}</span>
+                          ) : (
+                            <span className="text-xs text-muted">-</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Info - clickable */}
+                      <button
+                        onClick={(e) => { if (favCompareMode) { e.stopPropagation(); return; } openCarDetail(car.id); }}
+                        className="flex-1 min-w-0 text-right"
+                      >
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-[13px] font-bold truncate">{car.nameFa}</h3>
+                          <span className="text-[11px] font-bold text-primary shrink-0 mr-2">{toPersianDigits(formatPrice(car.priceMin))}</span>
+                        </div>
+                        <p className="text-[10px] text-muted">{car.brandFa} | {getOriginLabel(car.origin)}</p>
+                      </button>
+
+                      {/* Delete (hidden in compare mode) */}
+                      {!favCompareMode && (
+                        <button
+                          onClick={() => setConfirmDelete(car.id)}
+                          className="shrink-0 w-7 h-7 rounded-full hover:bg-danger/10 flex items-center justify-center transition-colors"
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted hover:text-danger transition-colors">
+                            <path d="M18 6L6 18M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Compare Action Button */}
+                  {favCompareMode && (
+                    <div className="p-3 border-t border-border">
+                      <button
+                        onClick={goToCompare}
+                        disabled={!canCompare}
+                        className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                          canCompare
+                            ? "bg-primary text-white shadow-lg shadow-primary/25 active:scale-[0.97]"
+                            : "bg-primary/20 text-primary/50"
+                        }`}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4" />
+                        </svg>
+                        {canCompare ? "مقایسه کن" : `${toPersianDigits(compareCount)} از ۲ انتخاب کنید`}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
+
+        {/* Confirm Delete Modal */}
+        {confirmDelete && (
+          <>
+            <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setConfirmDelete(null)} />
+            <div className="fixed bottom-0 inset-x-0 bg-surface rounded-t-2xl p-5 z-50 shadow-2xl" style={{ animation: "slideUp 0.2s ease-out" }}>
+              <div className="flex justify-center mb-3">
+                <div className="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-danger">
+                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                    <path d="M10 11v6M14 11v6" />
+                  </svg>
+                </div>
+              </div>
+              <p className="text-sm font-bold text-center mb-1">حذف از نشان‌شده‌ها</p>
+              <p className="text-xs text-muted text-center mb-4">
+                {favorites.find(f => f.id === confirmDelete)?.nameFa} از لیست نشان‌شده‌ها حذف بشه؟
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmDelete(null)}
+                  className="flex-1 py-2.5 bg-background text-foreground text-sm font-bold rounded-xl"
+                >
+                  انصراف
+                </button>
+                <button
+                  onClick={() => removeFavorite(confirmDelete)}
+                  className="flex-1 py-2.5 bg-danger text-white text-sm font-bold rounded-xl active:scale-[0.97] transition-transform"
+                >
+                  حذف کن
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Toast Notification */}
+        {toast && (
+          <div
+            className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-foreground text-background text-xs font-bold px-5 py-2.5 rounded-full shadow-xl z-50"
+            style={{ animation: "fadeIn 0.2s ease-out" }}
+          >
+            <div className="flex items-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+              {toast}
+            </div>
+          </div>
+        )}
 
         {/* Settings Section */}
         <div className="px-5 mb-6">
