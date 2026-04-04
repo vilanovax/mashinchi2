@@ -41,7 +41,7 @@ const tabs = [
 ];
 
 // Pages where bottom nav should NOT show
-const HIDDEN_PATHS = ["/explore", "/results", "/compare"];
+const HIDDEN_PATHS = ["/explore", "/results", "/compare", "/admin"];
 
 export default function BottomNav() {
   const pathname = usePathname();
