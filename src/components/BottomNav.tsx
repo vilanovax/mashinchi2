@@ -28,6 +28,17 @@ const tabs = [
     ),
   },
   {
+    key: "market",
+    label: "بازار",
+    path: "/market",
+    icon: (active: boolean) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.5" : "2"} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 3v18h18" />
+        <path d="M7 16l4-8 4 4 4-6" />
+      </svg>
+    ),
+  },
+  {
     key: "profile",
     label: "پروفایل",
     path: "/profile",

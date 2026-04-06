@@ -32,6 +32,8 @@ model Car {
   reviews     CarReview[]
   prices      PriceHistory[]
   sources     CarSource[]
+  listings    ListingStats[]
+  rawAnalyses CarRawAnalysis[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -275,6 +277,74 @@ model CarSource {
   updatedAt       DateTime @updatedAt
 
   @@index([carId, status])
+}
+
+model CarRawAnalysis {
+  id              String   @id @default(cuid())
+  carId           String
+  car             Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  // Raw data (full JSON stored as-is)
+  rawJson         String   // entire AI-extracted JSON
+
+  // Parsed fields for quick access
+  pros            String[]
+  cons            String[]
+  commonProblems  String[]
+  buyReasons      String[]
+  avoidReasons    String[]
+
+  // Extracted statements with source attribution
+  statements      String?  // JSON array of { feature, sentiment, problem, importance, source, statement }
+
+  // Feature statistics
+  featureStats    String?  // JSON array of { feature, positive_count, negative_count, overall_result }
+
+  // Processing
+  status          String   @default("pending") // "pending", "processing", "processed", "failed"
+  processedAt     DateTime?
+  processLog      String?  // what was generated from this analysis
+
+  // Metadata
+  sourceLabel     String?  // e.g. "ChatGPT extraction", "Claude analysis"
+  version         Int      @default(1) // for re-processing
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([carId, status])
+}
+
+model ListingStats {
+  id          String   @id @default(cuid())
+  carId       String
+  car         Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+  date        DateTime // daily snapshot
+  count       Int      // number of listings
+  source      String   // "bama", "divar", "manual"
+  avgPrice    BigInt?  // average listing price
+  minPrice    BigInt?
+  maxPrice    BigInt?
+  createdAt   DateTime @default(now())
+
+  @@unique([carId, date, source])
+  @@index([carId, date])
+}
+
+model MarketInsight {
+  id          String   @id @default(cuid())
+  date        DateTime // snapshot date
+  period      String   // "daily", "weekly", "monthly", "quarterly"
+  title       String   // e.g. "خلاصه بازار هفتگی"
+  summary     String   // AI-generated market summary
+  highlights  String[] // key bullet points
+  topRisers   String[] // car names with biggest price increase
+  topFallers  String[] // car names with biggest price decrease
+  hotListings String[] // cars with most listings
+  aiAnalysis  String?  // deeper AI commentary
+  createdAt   DateTime @default(now())
+
+  @@index([date, period])
 }
 
 model AppSettings {
