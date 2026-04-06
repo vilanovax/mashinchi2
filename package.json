@@ -10,7 +10,8 @@
     "db:seed": "node --import jiti/register prisma/seed.mjs",
     "db:migrate": "npx prisma migrate dev",
     "db:studio": "npx prisma studio",
-    "db:seed-intel": "node --import jiti/register prisma/seed-intelligence.mjs"
+    "db:seed-intel": "node --import jiti/register prisma/seed-intelligence.mjs",
+    "db:import": "node --import jiti/register prisma/import-cars.mjs"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.mjs"

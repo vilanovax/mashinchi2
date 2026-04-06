@@ -1,0 +1,62 @@
+[
+  {
+    "nameEn": "Hyundai Tucson",
+    "nameFa": "هیوندای توسان",
+    "brand": "Hyundai",
+    "brandFa": "هیوندای",
+    "category": "suv",
+    "year": 1403,
+    "priceMin": 4000000000,
+    "priceMax": 5000000000,
+    "origin": "korean",
+    "description": "شاسی‌بلند محبوب کره‌ای با طراحی مدرن و امکانات رفاهی بالا",
+    "tags": ["خانوادگی", "لوکس", "شاسی‌بلند"],
+    "scores": {
+      "comfort": 8, "performance": 7, "economy": 6,
+      "safety": 8, "prestige": 8, "reliability": 7,
+      "resaleValue": 7, "familyFriendly": 8, "sportiness": 5,
+      "offroad": 5, "cityDriving": 6, "longTrip": 8,
+      "maintenanceRisk": 4, "afterSales": 6
+    },
+    "specs": {
+      "engine": "2.0L", "horsepower": 155, "torque": 196,
+      "transmission": "automatic",
+      "fuelType": "gasoline",
+      "fuelConsumption": 9.0, "acceleration": 10.5,
+      "trunkVolume": 620, "groundClearance": 178,
+      "length": 4500, "width": 1865, "weight": 1570,
+      "seatingCapacity": 5
+    },
+    "intelligence": {
+      "acceleration": 6, "depreciation": 5, "repairCost": 6,
+      "secondHandMarket": 7, "priceDropRate": 5,
+      "buildQuality": 8, "afterSalesService": 6,
+      "ownerSatisfaction": 8, "purchaseRisk": 4, "fuelEconomy": 6,
+      "suitFamily": 8, "suitCity": 6, "suitTravel": 8,
+      "suitYoung": 5, "suitInvestment": 6,
+      "frequentPros": [
+        "طراحی مدرن و چشم‌نواز",
+        "فضای داخلی بزرگ و راحت",
+        "ایمنی بالا با تجهیزات کامل",
+        "رانندگی روان و لذت‌بخش"
+      ],
+      "frequentCons": [
+        "هزینه قطعات و تعمیرات بالا",
+        "مصرف سوخت نسبتاً زیاد در شهر",
+        "تامین قطعات در برخی شهرها دشوار"
+      ],
+      "commonIssues": [
+        "مشکلات گیربکس اتوماتیک در مدل‌های قدیمی‌تر",
+        "خرابی سنسور پارک"
+      ],
+      "purchaseWarnings": [
+        "حتماً سابقه تصادف و رنگ‌شدگی بررسی شود",
+        "کارکرد زیر ۱۰۰ هزار کیلومتر ترجیح داده شود"
+      ],
+      "ownerVerdict": "ماشین لوکس و مطمئنی برای خانواده‌ها، ولی هزینه نگهداری بالاست.",
+      "overallSummary": "توسان یکی از بهترین شاسی‌بلندهای بازار ایران با تعادل مناسب بین کیفیت، امکانات و قیمت است.",
+      "whyBuy": "اگر بودجه دارید و یک شاسی‌بلند مطمئن و خانوادگی می‌خواهید، توسان انتخاب عالی است.",
+      "whyNotBuy": "اگر بودجه محدود دارید یا نگران هزینه نگهداری هستید، گزینه‌های چینی مقرون‌به‌صرفه‌تر هستند."
+    }
+  }
+]
