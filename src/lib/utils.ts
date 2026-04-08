@@ -11,6 +11,16 @@ export function formatPrice(value: number | string): string {
   return num.toLocaleString("fa-IR");
 }
 
+export function formatPriceRange(min: string, max: string): string {
+  const minNum = parseInt(min);
+  const maxNum = parseInt(max);
+  if (!minNum && !maxNum) return "قیمت نامشخص";
+  if (!minNum) return toPersianDigits(formatPrice(max));
+  if (!maxNum) return toPersianDigits(formatPrice(min));
+  if (minNum === maxNum) return toPersianDigits(formatPrice(min));
+  return `${toPersianDigits(formatPrice(min))} ~ ${toPersianDigits(formatPrice(max))}`;
+}
+
 export function formatPriceShort(value: number | string): string {
   const num = typeof value === "string" ? parseInt(value) : value;
   if (num >= 1_000_000_000) {
