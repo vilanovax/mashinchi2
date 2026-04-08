@@ -347,7 +347,393 @@ export default function AdminSettingsPage() {
         </div>
       </div>
 
+      {/* Backup */}
+      <BackupSection fetchAdmin={fetchAdmin} showToast={showToast} />
+
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-foreground text-background text-xs font-bold px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// Backup Section
+// ═══════════════════════════════════════════════
+function BackupSection({ fetchAdmin, showToast }: { fetchAdmin: any; showToast: (msg: string) => void }) {
+  const [stats, setStats] = useState<any>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  const loadStats = async () => {
+    setLoadingStats(true);
+    try {
+      const res = await fetchAdmin("/api/admin/backup", { method: "POST" });
+      const data = await res.json();
+      setStats(data);
+    } catch {
+      showToast("خطا در دریافت آمار");
+    }
+    setLoadingStats(false);
+  };
+
+  useEffect(() => { loadStats(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleDownload = async (scope: string) => {
+    setDownloading(scope);
+    try {
+      const res = await fetchAdmin(`/api/admin/backup?scope=${scope}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mashinchi-backup-${scope}-${new Date().toISOString().split("T")[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`بکاپ ${scope === "full" ? "کامل" : scope} دانلود شد`);
+    } catch {
+      showToast("خطا در دانلود");
+    }
+    setDownloading(null);
+  };
+
+  const totalRecords = stats
+    ? Object.values(stats.cars as Record<string, number>).reduce((a: number, b: number) => a + b, 0) +
+      Object.values(stats.users as Record<string, number>).reduce((a: number, b: number) => a + b, 0) +
+      Object.values(stats.system as Record<string, number>).reduce((a: number, b: number) => a + b, 0)
+    : 0;
+
+  return (
+    <div className="bg-surface rounded-2xl border border-border p-5 mb-4">
+      <h2 className="text-sm font-black mb-4 flex items-center gap-2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+        </svg>
+        پشتیبان‌گیری (بکاپ)
+      </h2>
+
+      {/* Stats */}
+      {loadingStats ? (
+        <div className="flex justify-center py-6">
+          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : stats && (
+        <div className="mb-5">
+          {/* Summary */}
+          <div className="bg-background rounded-xl p-3 mb-3 flex items-center justify-between">
+            <span className="text-xs font-bold text-foreground">کل رکوردها</span>
+            <span className="text-lg font-black text-primary">{toPersianDigits(totalRecords)}</span>
+          </div>
+
+          {/* Detail grid */}
+          <div className="grid grid-cols-3 gap-3">
+            {/* Cars group */}
+            <div className="bg-background rounded-xl p-3">
+              <h4 className="text-[9px] font-bold text-primary mb-2">خودروها</h4>
+              <div className="space-y-1">
+                {[
+                  { label: "خودرو", count: stats.cars.cars },
+                  { label: "امتیاز", count: stats.cars.scores },
+                  { label: "مشخصات", count: stats.cars.specs },
+                  { label: "تحلیل", count: stats.cars.intelligence },
+                  { label: "نظرات", count: stats.cars.reviews },
+                  { label: "قیمت", count: stats.cars.prices },
+                  { label: "منابع", count: stats.cars.sources },
+                  { label: "تحلیل خام", count: stats.cars.rawAnalyses },
+                  { label: "تگ", count: stats.cars.tags },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center justify-between">
+                    <span className="text-[9px] text-muted">{item.label}</span>
+                    <span className="text-[10px] font-bold">{toPersianDigits(item.count)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Users group */}
+            <div className="bg-background rounded-xl p-3">
+              <h4 className="text-[9px] font-bold text-emerald-500 mb-2">کاربران</h4>
+              <div className="space-y-1">
+                {[
+                  { label: "کاربر", count: stats.users.users },
+                  { label: "تعامل", count: stats.users.interactions },
+                  { label: "پروفایل سلیقه", count: stats.users.tasteProfiles },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center justify-between">
+                    <span className="text-[9px] text-muted">{item.label}</span>
+                    <span className="text-[10px] font-bold">{toPersianDigits(item.count)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* System group */}
+            <div className="bg-background rounded-xl p-3">
+              <h4 className="text-[9px] font-bold text-amber-500 mb-2">سیستم</h4>
+              <div className="space-y-1">
+                {[
+                  { label: "کرالر", count: stats.system.crawlers },
+                  { label: "تنظیمات", count: stats.system.settings },
+                  { label: "اعلان", count: stats.system.notifications },
+                  { label: "تحلیل بازار", count: stats.system.marketInsights },
+                  { label: "آمار آگهی", count: stats.system.listingStats },
+                  { label: "لاگ", count: stats.system.auditLogs },
+                  { label: "ادمین", count: stats.system.adminUsers },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center justify-between">
+                    <span className="text-[9px] text-muted">{item.label}</span>
+                    <span className="text-[10px] font-bold">{toPersianDigits(item.count)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Download buttons */}
+      <div className="space-y-2">
+        <button onClick={() => handleDownload("full")} disabled={!!downloading}
+          className="w-full flex items-center justify-between px-4 py-3 bg-primary text-white rounded-xl font-bold text-xs disabled:opacity-50">
+          <span className="flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+            {downloading === "full" ? "در حال دانلود..." : "دانلود بکاپ کامل"}
+          </span>
+          <span className="text-[10px] opacity-80">JSON</span>
+        </button>
+
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { scope: "cars", label: "خودروها", icon: "M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0M5 17H3v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2" },
+            { scope: "users", label: "کاربران", icon: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8" },
+            { scope: "settings", label: "تنظیمات", icon: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0" },
+          ].map((btn) => (
+            <button key={btn.scope} onClick={() => handleDownload(btn.scope)} disabled={!!downloading}
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-surface border border-border rounded-xl text-[10px] font-bold text-muted hover:text-foreground hover:border-primary/20 disabled:opacity-50 transition-all">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d={btn.icon} /></svg>
+              {downloading === btn.scope ? "..." : btn.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Restore section */}
+      <RestoreSection fetchAdmin={fetchAdmin} showToast={showToast} onRestored={loadStats} />
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// Restore Section
+// ═══════════════════════════════════════════════
+function RestoreSection({ fetchAdmin, showToast, onRestored }: { fetchAdmin: any; showToast: (msg: string) => void; onRestored: () => void }) {
+  const [backupData, setBackupData] = useState<any>(null);
+  const [backupMeta, setBackupMeta] = useState<{ exportedAt: string; scope: string; carsCount: number; exportedBy: string } | null>(null);
+  const [mode, setMode] = useState<"full" | "merge">("merge");
+  const [confirmStep, setConfirmStep] = useState(0); // 0=none, 1=confirm, 2=double-confirm for full
+  const [restoring, setRestoring] = useState(false);
+  const [result, setResult] = useState<{ restored: number; skipped: number; errors: string[] } | null>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target?.result as string);
+        if (!data._meta) {
+          showToast("فایل بکاپ نامعتبر — فیلد _meta یافت نشد");
+          return;
+        }
+        setBackupData(data);
+        setBackupMeta({
+          exportedAt: data._meta.exportedAt,
+          scope: data._meta.scope,
+          exportedBy: data._meta.exportedBy || "unknown",
+          carsCount: data.cars?.length || 0,
+        });
+        setConfirmStep(0);
+        setResult(null);
+        showToast(`بکاپ بارگذاری شد — ${toPersianDigits(data.cars?.length || 0)} خودرو`);
+      } catch {
+        showToast("فایل JSON نامعتبر");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const handleRestore = async () => {
+    if (!backupData) return;
+    setRestoring(true);
+    try {
+      const res = await fetchAdmin("/api/admin/backup", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ backup: backupData, mode }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        showToast(`خطا: ${data.error}`);
+      } else {
+        setResult(data);
+        showToast(`${toPersianDigits(data.restored)} رکورد بازیابی شد`);
+        onRestored();
+      }
+    } catch {
+      showToast("خطا در بازیابی");
+    }
+    setRestoring(false);
+    setConfirmStep(0);
+  };
+
+  return (
+    <div className="mt-5 pt-5 border-t border-border">
+      <h3 className="text-xs font-black mb-3 flex items-center gap-2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted">
+          <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        بازیابی (ریستور)
+      </h3>
+
+      {/* File select */}
+      {!backupMeta && !result && (
+        <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary/30 transition-colors">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted">
+            <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          <span className="text-xs text-muted font-bold">انتخاب فایل بکاپ JSON</span>
+          <input type="file" accept=".json" onChange={handleFileSelect} className="hidden" />
+        </label>
+      )}
+
+      {/* Backup info + mode select */}
+      {backupMeta && !result && (
+        <div>
+          {/* Backup file info */}
+          <div className="bg-background rounded-xl p-3 mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold">فایل بکاپ</span>
+              <button onClick={() => { setBackupData(null); setBackupMeta(null); setConfirmStep(0); }}
+                className="text-[9px] text-muted hover:text-red-400">حذف</button>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-[10px]">
+              <div><span className="text-muted">تاریخ:</span> <span className="font-bold">{new Date(backupMeta.exportedAt).toLocaleDateString("fa-IR")}</span></div>
+              <div><span className="text-muted">نوع:</span> <span className="font-bold">{backupMeta.scope === "full" ? "کامل" : backupMeta.scope}</span></div>
+              <div><span className="text-muted">خودروها:</span> <span className="font-bold">{toPersianDigits(backupMeta.carsCount)}</span></div>
+            </div>
+          </div>
+
+          {/* Mode select */}
+          <div className="mb-3">
+            <label className="text-[10px] font-bold block mb-2">حالت بازیابی</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => { setMode("merge"); setConfirmStep(0); }}
+                className={`p-3 rounded-xl border-2 text-right transition-all ${
+                  mode === "merge" ? "border-emerald-500/40 bg-emerald-500/5" : "border-border"
+                }`}>
+                <div className="text-xs font-bold text-foreground">فقط جدیدها</div>
+                <div className="text-[9px] text-muted mt-0.5">رکوردهای تکراری رد میشوند. داده‌های فعلی حفظ میشوند.</div>
+              </button>
+              <button onClick={() => { setMode("full"); setConfirmStep(0); }}
+                className={`p-3 rounded-xl border-2 text-right transition-all ${
+                  mode === "full" ? "border-red-500/40 bg-red-500/5" : "border-border"
+                }`}>
+                <div className="text-xs font-bold text-foreground">جایگزینی کامل</div>
+                <div className="text-[9px] text-red-400 mt-0.5">تمام داده‌های فعلی پاک و با بکاپ جایگزین میشوند!</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Confirm flow */}
+          {confirmStep === 0 && (
+            <button onClick={() => setConfirmStep(1)}
+              className={`w-full py-3 rounded-xl text-xs font-bold ${
+                mode === "full"
+                  ? "bg-red-500 text-white"
+                  : "bg-emerald-500 text-white"
+              }`}>
+              {mode === "full" ? "بازیابی کامل (حذف داده‌های فعلی)" : "بازیابی فقط جدیدها"}
+            </button>
+          )}
+
+          {confirmStep === 1 && (
+            <div className={`rounded-xl p-4 border-2 ${mode === "full" ? "bg-red-500/5 border-red-500/30" : "bg-amber-500/5 border-amber-500/30"}`}>
+              <p className="text-xs font-bold mb-2">
+                {mode === "full"
+                  ? "تمام داده‌های فعلی دیتابیس پاک و با بکاپ جایگزین میشوند. آیا مطمئن هستید؟"
+                  : `${toPersianDigits(backupMeta.carsCount)} خودرو بررسی و موارد جدید اضافه میشوند. ادامه میدهید؟`}
+              </p>
+              <div className="flex gap-2">
+                {mode === "full" ? (
+                  <button onClick={() => setConfirmStep(2)}
+                    className="px-4 py-2 bg-red-500 text-white text-[10px] font-bold rounded-lg">
+                    بله، مطمئنم
+                  </button>
+                ) : (
+                  <button onClick={handleRestore} disabled={restoring}
+                    className="px-4 py-2 bg-emerald-500 text-white text-[10px] font-bold rounded-lg disabled:opacity-50">
+                    {restoring ? "در حال بازیابی..." : "تایید و بازیابی"}
+                  </button>
+                )}
+                <button onClick={() => setConfirmStep(0)}
+                  className="px-4 py-2 bg-surface border border-border text-[10px] font-bold rounded-lg text-muted">
+                  انصراف
+                </button>
+              </div>
+            </div>
+          )}
+
+          {confirmStep === 2 && (
+            <div className="rounded-xl p-4 border-2 bg-red-500/10 border-red-500/40">
+              <p className="text-sm font-black text-red-500 mb-2">تایید نهایی</p>
+              <p className="text-xs text-red-400 mb-3">
+                تمام خودروها، امتیازها، نظرات، قیمت‌ها و تحلیل‌ها حذف و از بکاپ بازنشانی میشوند. این عملیات غیرقابل برگشت است.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={handleRestore} disabled={restoring}
+                  className="px-5 py-2.5 bg-red-600 text-white text-xs font-bold rounded-lg disabled:opacity-50">
+                  {restoring ? "در حال بازیابی..." : "حذف همه و بازیابی"}
+                </button>
+                <button onClick={() => setConfirmStep(0)}
+                  className="px-4 py-2 bg-surface border border-border text-[10px] font-bold rounded-lg text-muted">
+                  انصراف
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Result */}
+      {result && (
+        <div className="bg-background rounded-xl p-4">
+          <h4 className="text-xs font-black mb-2">نتیجه بازیابی</h4>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="text-center">
+              <div className="text-lg font-black text-emerald-500">{toPersianDigits(result.restored)}</div>
+              <div className="text-[9px] text-muted">بازیابی شده</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-black text-muted">{toPersianDigits(result.skipped)}</div>
+              <div className="text-[9px] text-muted">رد شده</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-black text-red-400">{toPersianDigits(result.errors.length)}</div>
+              <div className="text-[9px] text-muted">خطا</div>
+            </div>
+          </div>
+          {result.errors.length > 0 && (
+            <div className="bg-red-500/5 rounded-lg p-2 mb-2">
+              {result.errors.slice(0, 5).map((e, i) => (
+                <div key={i} className="text-[9px] text-red-400">- {e}</div>
+              ))}
+            </div>
+          )}
+          <button onClick={() => { setResult(null); setBackupData(null); setBackupMeta(null); }}
+            className="text-[10px] text-primary font-bold">
+            بازگشت
+          </button>
+        </div>
+      )}
     </div>
   );
 }

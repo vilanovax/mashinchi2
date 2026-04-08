@@ -11,7 +11,9 @@
     "db:migrate": "npx prisma migrate dev",
     "db:studio": "npx prisma studio",
     "db:seed-intel": "node --import jiti/register prisma/seed-intelligence.mjs",
-    "db:import": "node --import jiti/register prisma/import-cars.mjs"
+    "db:import": "node --import jiti/register prisma/import-cars.mjs",
+    "db:backup": "./scripts/backup.sh",
+    "db:restore": "./scripts/restore.sh"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.mjs"
