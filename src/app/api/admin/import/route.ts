@@ -36,13 +36,29 @@ export async function POST(request: NextRequest) {
 
   for (const carData of cars) {
     try {
-      if (!carData.nameEn || !carData.nameFa || !carData.brandFa || !carData.category || !carData.origin || !carData.priceMin || !carData.priceMax) {
-        errors.push(`${carData.nameFa || carData.nameEn || "unknown"}: فیلدهای الزامی ناقص`);
+      if (!carData.nameFa || !carData.brandFa || !carData.category || !carData.origin) {
+        errors.push(`${carData.nameFa || carData.nameEn || "unknown"}: فیلدهای الزامی ناقص (nameFa, brandFa, category, origin)`);
         continue;
       }
 
-      // Check if exists by nameEn
-      const existing = await prisma.car.findFirst({ where: { nameEn: carData.nameEn } });
+      // Auto-generate nameEn if missing
+      if (!carData.nameEn) {
+        carData.nameEn = carData.nameFa;
+      }
+
+      // Default price to 0 if missing (can be updated later)
+      if (!carData.priceMin) carData.priceMin = "0";
+      if (!carData.priceMax) carData.priceMax = "0";
+
+      // Check if exists by nameEn or nameFa
+      const existing = await prisma.car.findFirst({
+        where: {
+          OR: [
+            { nameEn: carData.nameEn },
+            { nameFa: carData.nameFa },
+          ],
+        },
+      });
 
       if (existing) {
         if (mode === "update") {

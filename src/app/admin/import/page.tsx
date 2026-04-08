@@ -64,6 +64,119 @@ export default function AdminImportPage() {
       .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Auto-enrich from Persian name ──
+  function enrichFromName(name: string): PreviewCar {
+    const n = name.trim();
+
+    // Brand detection rules: { keywords in nameFa → brandFa, brand, origin, category hint }
+    const BRAND_RULES: { keywords: string[]; brandFa: string; brand: string; origin: string; defaultCat: string }[] = [
+      // Iranian
+      { keywords: ["تارا", "دنا", "سمند", "پژو", "هایما", "رانا", "سهند"], brandFa: "ایران‌خودرو", brand: "IKCO", origin: "iranian", defaultCat: "sedan" },
+      { keywords: ["شاهین", "کوییک", "ساینا", "تیبا", "ریرا", "آریسان", "رسپکت"], brandFa: "سایپا", brand: "SAIPA", origin: "iranian", defaultCat: "sedan" },
+      { keywords: ["زامیاد"], brandFa: "زامیاد", brand: "Zamyad", origin: "iranian", defaultCat: "pickup" },
+      { keywords: ["تندر"], brandFa: "ایران‌خودرو", brand: "IKCO", origin: "iranian", defaultCat: "sedan" },
+      // Chinese
+      { keywords: ["ام‌وی‌ام", "MVM"], brandFa: "ام‌وی‌ام", brand: "MVM", origin: "chinese", defaultCat: "crossover" },
+      { keywords: ["چری", "تیگو", "آریزو"], brandFa: "چری", brand: "Chery", origin: "chinese", defaultCat: "suv" },
+      { keywords: ["فونیکس"], brandFa: "فونیکس", brand: "Fownix", origin: "chinese", defaultCat: "crossover" },
+      { keywords: ["چانگان"], brandFa: "چانگان", brand: "Changan", origin: "chinese", defaultCat: "crossover" },
+      { keywords: ["هاوال"], brandFa: "هاوال", brand: "Haval", origin: "chinese", defaultCat: "suv" },
+      { keywords: ["جک", "JAC"], brandFa: "جک", brand: "JAC", origin: "chinese", defaultCat: "sedan" },
+      { keywords: ["بایک", "BAIC"], brandFa: "بایک", brand: "BAIC", origin: "chinese", defaultCat: "crossover" },
+      { keywords: ["دانگ‌فنگ"], brandFa: "دانگ‌فنگ", brand: "Dongfeng", origin: "chinese", defaultCat: "suv" },
+      { keywords: ["جیلی"], brandFa: "جیلی", brand: "Geely", origin: "chinese", defaultCat: "sedan" },
+      { keywords: ["بی‌وای‌دی", "BYD"], brandFa: "بی‌وای‌دی", brand: "BYD", origin: "chinese", defaultCat: "suv" },
+      { keywords: ["لیفان"], brandFa: "لیفان", brand: "Lifan", origin: "chinese", defaultCat: "suv" },
+      { keywords: ["کی‌ام‌سی", "KMC"], brandFa: "کرمان‌موتور", brand: "KMC", origin: "chinese", defaultCat: "suv" },
+      { keywords: ["ام‌جی", "MG"], brandFa: "ام‌جی", brand: "MG", origin: "chinese", defaultCat: "sedan" },
+      { keywords: ["بستیون"], brandFa: "بستیون", brand: "Bestune", origin: "chinese", defaultCat: "sedan" },
+      { keywords: ["بسترن"], brandFa: "بسترن", brand: "Besturn", origin: "chinese", defaultCat: "sedan" },
+      { keywords: ["دایون"], brandFa: "دایون", brand: "Dayun", origin: "chinese", defaultCat: "suv" },
+      { keywords: ["گک", "GAC"], brandFa: "جک", brand: "GAC", origin: "chinese", defaultCat: "crossover" },
+      { keywords: ["تیگارد"], brandFa: "تیگارد", brand: "Tigard", origin: "chinese", defaultCat: "crossover" },
+      { keywords: ["تیسان"], brandFa: "تیسان", brand: "Tissan", origin: "chinese", defaultCat: "crossover" },
+      { keywords: ["دیگنیتی"], brandFa: "بهمن‌موتور", brand: "Dignity", origin: "chinese", defaultCat: "suv" },
+      { keywords: ["فردا"], brandFa: "فردا موتورز", brand: "Farda", origin: "chinese", defaultCat: "crossover" },
+      { keywords: ["لاماری"], brandFa: "لاماری", brand: "Lamari", origin: "chinese", defaultCat: "sedan" },
+      { keywords: ["لونا"], brandFa: "لونا", brand: "Luna", origin: "chinese", defaultCat: "crossover" },
+      { keywords: ["لوکانو"], brandFa: "لوکانو", brand: "Lucano", origin: "chinese", defaultCat: "suv" },
+      { keywords: ["ونوسیا"], brandFa: "ونوسیا", brand: "Venucia", origin: "chinese", defaultCat: "crossover" },
+      { keywords: ["وویا"], brandFa: "وویا", brand: "Voyah", origin: "chinese", defaultCat: "suv" },
+      { keywords: ["ولکس"], brandFa: "ولکس", brand: "Voleex", origin: "chinese", defaultCat: "sedan" },
+      { keywords: ["آمیکو"], brandFa: "آمیکو", brand: "Amico", origin: "chinese", defaultCat: "sedan" },
+      { keywords: ["اطلس"], brandFa: "اطلس", brand: "Atlas", origin: "chinese", defaultCat: "crossover" },
+      { keywords: ["کلوت"], brandFa: "کلوت", brand: "Kalout", origin: "iranian", defaultCat: "crossover" },
+      { keywords: ["بک", "Buick"], brandFa: "بیوک", brand: "Buick", origin: "chinese", defaultCat: "suv" },
+      // Korean
+      { keywords: ["هیوندای"], brandFa: "هیوندای", brand: "Hyundai", origin: "korean", defaultCat: "sedan" },
+      { keywords: ["کیا"], brandFa: "کیا", brand: "KIA", origin: "korean", defaultCat: "sedan" },
+      { keywords: ["سانگ‌یانگ"], brandFa: "سانگ‌یانگ", brand: "SsangYong", origin: "korean", defaultCat: "suv" },
+      // Japanese
+      { keywords: ["تویوتا"], brandFa: "تویوتا", brand: "Toyota", origin: "japanese", defaultCat: "sedan" },
+      { keywords: ["نیسان"], brandFa: "نیسان", brand: "Nissan", origin: "japanese", defaultCat: "sedan" },
+      { keywords: ["هوندا"], brandFa: "هوندا", brand: "Honda", origin: "japanese", defaultCat: "sedan" },
+      { keywords: ["مزدا"], brandFa: "مزدا", brand: "Mazda", origin: "japanese", defaultCat: "sedan" },
+      { keywords: ["میتسوبیشی"], brandFa: "میتسوبیشی", brand: "Mitsubishi", origin: "japanese", defaultCat: "suv" },
+      { keywords: ["سوزوکی"], brandFa: "سوزوکی", brand: "Suzuki", origin: "japanese", defaultCat: "hatchback" },
+      // European
+      { keywords: ["رنو"], brandFa: "رنو", brand: "Renault", origin: "european", defaultCat: "sedan" },
+      { keywords: ["پژو"], brandFa: "پژو", brand: "Peugeot", origin: "european", defaultCat: "sedan" },
+      { keywords: ["بی‌ام‌و", "BMW"], brandFa: "بی‌ام‌و", brand: "BMW", origin: "european", defaultCat: "sedan" },
+      { keywords: ["آئودی", "Audi"], brandFa: "آئودی", brand: "Audi", origin: "european", defaultCat: "suv" },
+      { keywords: ["فولکس"], brandFa: "فولکس‌واگن", brand: "Volkswagen", origin: "european", defaultCat: "crossover" },
+      { keywords: ["لکسوس"], brandFa: "لکسوس", brand: "Lexus", origin: "japanese", defaultCat: "suv" },
+    ];
+
+    // Category hints from name
+    const CAT_HINTS: { keywords: string[]; category: string }[] = [
+      { keywords: ["وانت", "پیکاپ"], category: "pickup" },
+      { keywords: ["کراس", "X33", "X55", "CS35", "FX", "HR-V", "وزل", "C-HR", "ASX", "GS3", "CX-"], category: "crossover" },
+      { keywords: ["شاسی", "SUV", "توسان", "سانتافه", "اسپورتیج", "سورنتو", "RAV", "CX-5", "اوتلندر", "CR-V", "H6", "H2", "X70", "K7", "AX7", "ایکس‌تریل", "سانگ", "تیگو", "ID4", "Q5", "X2", "سری ۵", "کولئوس", "داستر", "قشقایی", "7x", "8S"], category: "suv" },
+      { keywords: ["هاچبک", "کوییک", "ساینا", "تیبا", "۲۰۷", "بالنو", "GC6", "C30"], category: "hatchback" },
+      { keywords: ["سدان", "تارا", "دنا", "شاهین", "سمند", "النترا", "سوناتا", "سراتو", "کرولا", "سیویک", "اکسنت", "امگرند", "آریزو", "J3", "J4", "J5", "سیلفی", "مزدا ۳", "اپتیما", "تلیسمان", "سیمبل", "GT"], category: "sedan" },
+    ];
+
+    // Find brand
+    let brandFa = "";
+    let brand = "";
+    let origin = "iranian";
+    let defaultCat = "sedan";
+
+    for (const rule of BRAND_RULES) {
+      if (rule.keywords.some((kw) => n.includes(kw))) {
+        brandFa = rule.brandFa;
+        brand = rule.brand;
+        origin = rule.origin;
+        defaultCat = rule.defaultCat;
+        break;
+      }
+    }
+
+    // Find category
+    let category = defaultCat;
+    for (const hint of CAT_HINTS) {
+      if (hint.keywords.some((kw) => n.includes(kw))) {
+        category = hint.category;
+        break;
+      }
+    }
+
+    // Generate English name
+    const nameEn = brand ? `${brand} ${n.replace(brandFa, "").replace(/[^\w\s۰-۹آ-ی]/g, "").trim()}` : n;
+
+    return {
+      nameEn,
+      nameFa: n,
+      brandFa,
+      brand,
+      category,
+      origin,
+      year: 1403,
+      priceMin: "0",
+      priceMax: "0",
+    };
+  }
+
   // ── Match logic ──
   function findMatch(nameEn: string, nameFa: string): { type: "exact" | "similar" | "new"; car?: ExistingCar } {
     const en = nameEn.toLowerCase().trim();
@@ -128,7 +241,24 @@ export default function AdminImportPage() {
   const handlePreview = () => {
     try {
       const data = JSON.parse(jsonInput);
-      let cars: PreviewCar[] = Array.isArray(data) ? data : data.cars ? data.cars : [data];
+      let rawItems: any[] = Array.isArray(data) ? data : data.cars ? data.cars : [data];
+
+      // Handle string arrays (just car names) — auto-enrich from name
+      let cars: PreviewCar[] = rawItems.map((item) => {
+        if (typeof item === "string") {
+          return enrichFromName(item.trim());
+        }
+        // Fill missing fields from name if possible
+        const car = item as PreviewCar;
+        if (!car.brandFa || !car.origin || !car.nameEn) {
+          const enriched = enrichFromName(car.nameFa || car.nameEn || "");
+          return {
+            ...enriched,
+            ...Object.fromEntries(Object.entries(car).filter(([, v]) => v !== undefined && v !== null && v !== "")),
+          } as PreviewCar;
+        }
+        return car;
+      });
 
       // Add match info
       cars = cars.map((car) => ({
@@ -337,7 +467,7 @@ export default function AdminImportPage() {
               </button>
               {jsonInput.trim() && (
                 <span className="text-[10px] text-muted">
-                  {(() => { try { const d = JSON.parse(jsonInput); const c = Array.isArray(d) ? d : d.cars || [d]; return `${toPersianDigits(c.length)} خودرو شناسایی شد`; } catch { return "JSON نامعتبر"; } })()}
+                  {(() => { try { const d = JSON.parse(jsonInput); const c = Array.isArray(d) ? d : d.cars || [d]; return `${toPersianDigits(c.length)} ${typeof c[0] === "string" ? "اسم خودرو" : "خودرو"} شناسایی شد`; } catch { return "JSON نامعتبر"; } })()}
                 </span>
               )}
             </div>
@@ -365,6 +495,9 @@ export default function AdminImportPage() {
                     مشابه: {toPersianDigits(preview.filter((c) => c._match?.type === "similar").length)}
                   </span>
                 </div>
+                {preview.some((c) => !c.priceMin || c.priceMin === "0") && (
+                  <span className="text-[9px] text-amber-500 font-bold">بدون قیمت: {toPersianDigits(preview.filter((c) => !c.priceMin || c.priceMin === "0").length)}</span>
+                )}
                 <button onClick={handleImport} disabled={importing}
                   className="mr-auto px-4 py-1.5 bg-emerald-500 text-white text-[10px] font-bold rounded-lg disabled:opacity-50">
                   {importing ? "..." : `ثبت ${toPersianDigits(mode === "skip" ? preview.filter((c) => c._match?.type === "new").length : preview.length)} خودرو`}
