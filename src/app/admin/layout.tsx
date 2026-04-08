@@ -42,7 +42,7 @@ const NAV_GROUPS: NavGroup[] = [
       { path: "/admin/prices", label: "قیمت‌ها", icon: "M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0-6C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" },
       { path: "/admin/reviews", label: "نظرات", icon: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
       { path: "/admin/scoring", label: "پارامترها", icon: "M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" },
-      { path: "/admin/import", label: "واردات", icon: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" },
+      { path: "/admin/import", label: "اضافه کردن", icon: "M12 4v16m8-8H4" },
     ],
   },
   {
