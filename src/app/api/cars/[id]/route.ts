@@ -22,6 +22,16 @@ export async function GET(
     return NextResponse.json({ error: "Car not found" }, { status: 404 });
   }
 
+  // Fetch price history (last 3 months)
+  const threeMonthsAgo = new Date();
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+  const priceHistory = await prisma.priceHistory.findMany({
+    where: { carId: id, date: { gte: threeMonthsAgo } },
+    orderBy: { date: "asc" },
+    select: { date: true, price: true, source: true },
+  });
+
   // Fetch all other cars for similarity computation
   const allCars = await prisma.car.findMany({
     where: { id: { not: id } },
@@ -92,6 +102,11 @@ export async function GET(
 
   return NextResponse.json({
     ...carData,
+    priceHistory: priceHistory.map((p) => ({
+      date: p.date.toISOString().split("T")[0],
+      price: p.price.toString(),
+      source: p.source,
+    })),
     similarCars,
     alternatives,
   });

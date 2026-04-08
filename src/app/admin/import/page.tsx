@@ -72,7 +72,7 @@ export default function AdminImportPage() {
     const BRAND_RULES: { keywords: string[]; brandFa: string; brand: string; origin: string; defaultCat: string }[] = [
       // Iranian
       { keywords: ["تارا", "دنا", "سمند", "پژو", "هایما", "رانا", "سهند"], brandFa: "ایران‌خودرو", brand: "IKCO", origin: "iranian", defaultCat: "sedan" },
-      { keywords: ["شاهین", "کوییک", "ساینا", "تیبا", "ریرا", "آریسان", "رسپکت"], brandFa: "سایپا", brand: "SAIPA", origin: "iranian", defaultCat: "sedan" },
+      { keywords: ["شاهین", "کوییک", "ساینا", "تیبا", "ریرا", "ری‌را", "آریسان", "رسپکت", "سایپا", "سراتو سایپا"], brandFa: "سایپا", brand: "SAIPA", origin: "iranian", defaultCat: "sedan" },
       { keywords: ["زامیاد"], brandFa: "زامیاد", brand: "Zamyad", origin: "iranian", defaultCat: "pickup" },
       { keywords: ["تندر"], brandFa: "ایران‌خودرو", brand: "IKCO", origin: "iranian", defaultCat: "sedan" },
       // Chinese

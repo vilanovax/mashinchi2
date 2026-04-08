@@ -15,6 +15,7 @@ interface Car {
   priceMin: string;
   priceMax: string;
   description: string | null;
+  isNew: boolean;
   tags: string[];
   scores: Record<string, number> | null;
   specs: {
@@ -72,6 +73,7 @@ interface CarDetail {
     suitYoung: number;
     suitInvestment: number;
   } | null;
+  priceHistory: { date: string; price: string; source: string }[];
   similarCars: { id: string; nameFa: string; brandFa: string; priceMin: string; priceMax: string }[];
   alternatives: { id: string; nameFa: string; brandFa: string; priceMin: string; priceMax: string }[];
 }
@@ -106,6 +108,7 @@ export default function CatalogPage() {
   const [search, setSearch] = useState("");
   const [originFilter, setOriginFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [conditionFilter, setConditionFilter] = useState("all");
   const [sortBy, setSortBy] = useState("price-asc");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedCar, setSelectedCar] = useState<CarDetail | null>(null);
@@ -158,6 +161,13 @@ export default function CatalogPage() {
       result = result.filter((c) => c.category === categoryFilter);
     }
 
+    // Condition (new/used)
+    if (conditionFilter === "new") {
+      result = result.filter((c) => c.isNew);
+    } else if (conditionFilter === "used") {
+      result = result.filter((c) => !c.isNew);
+    }
+
     // Sort
     if (sortBy === "price-asc") {
       result.sort((a, b) => parseInt(a.priceMin) - parseInt(b.priceMin));
@@ -168,7 +178,7 @@ export default function CatalogPage() {
     }
 
     return result;
-  }, [cars, search, originFilter, categoryFilter, sortBy]);
+  }, [cars, search, originFilter, categoryFilter, conditionFilter, sortBy]);
 
   const openCarDetail = async (carId: string) => {
     setSheetOpen(true);
@@ -275,6 +285,24 @@ export default function CatalogPage() {
             </button>
           ))}
           <div className="w-px bg-border shrink-0 mx-0.5" />
+          {[
+            { key: "all", label: "همه" },
+            { key: "new", label: "صفر" },
+            { key: "used", label: "کارکرده" },
+          ].map((cond) => (
+            <button
+              key={cond.key}
+              onClick={() => setConditionFilter(prev => prev === cond.key ? "all" : cond.key)}
+              className={`shrink-0 text-[10px] px-2.5 py-1 rounded-full font-bold transition-colors ${
+                conditionFilter === cond.key && cond.key !== "all"
+                  ? "bg-emerald-600 text-white"
+                  : "bg-background text-muted"
+              }`}
+            >
+              {cond.label}
+            </button>
+          ))}
+          <div className="w-px bg-border shrink-0 mx-0.5" />
           {SORT_OPTIONS.map((s) => (
             <button
               key={s.key}
@@ -372,6 +400,13 @@ export default function CatalogPage() {
                       </span>
                       <span className="text-[9px] bg-background text-muted px-1.5 py-0.5 rounded-full">
                         {getCategoryLabel(car.category)}
+                      </span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                        car.isNew
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                          : "bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                      }`}>
+                        {car.isNew ? "صفر" : "کارکرده"}
                       </span>
                     </div>
 
@@ -491,15 +526,15 @@ export default function CatalogPage() {
                 {/* Compare button */}
                 <button
                   onClick={() => { toggleCompare(selectedCar.id); }}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
-                    isInCompare(selectedCar.id) ? "bg-primary/15" : "bg-background"
+                  title="افزودن به مقایسه"
+                  className={`h-8 px-2.5 rounded-full flex items-center justify-center gap-1 transition-colors text-[10px] font-bold ${
+                    isInCompare(selectedCar.id) ? "bg-primary/15 text-primary" : "bg-background text-muted"
                   }`}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                    className={isInCompare(selectedCar.id) ? "text-primary" : "text-muted"}
-                  >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4" />
                   </svg>
+                  {isInCompare(selectedCar.id) ? "در مقایسه" : "مقایسه"}
                 </button>
                 {/* Favorite button */}
                 <button
@@ -534,6 +569,9 @@ export default function CatalogPage() {
                 </div>
               </div>
             )}
+
+            {/* Price Chart */}
+            <PriceChartMini history={selectedCar.priceHistory} />
 
             {/* Summary */}
             {selectedCar.intel && (
@@ -675,6 +713,101 @@ export default function CatalogPage() {
           </div>
         ) : null}
       </BottomSheet>
+    </div>
+  );
+}
+
+// ── Mini Price Chart for BottomSheet ──
+function PriceChartMini({ history }: { history: { date: string; price: string; source: string }[] }) {
+  if (!history || history.length === 0) {
+    return (
+      <div className="bg-background rounded-xl p-4">
+        <h4 className="text-xs font-black mb-2">روند قیمت</h4>
+        <div className="text-center py-4">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto text-muted/30 mb-1.5">
+            <path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" />
+          </svg>
+          <p className="text-[10px] text-muted">داده قیمتی هنوز ثبت نشده</p>
+        </div>
+      </div>
+    );
+  }
+
+  const prices = history.map((p) => Number(p.price));
+  const minP = Math.min(...prices);
+  const maxP = Math.max(...prices);
+  const range = maxP - minP || 1;
+
+  const W = 300;
+  const H = 120;
+  const PAD = 25;
+
+  const points = history.map((p, i) => {
+    const x = PAD + ((W - PAD - 10) * i) / Math.max(history.length - 1, 1);
+    const y = PAD + (H - PAD * 2) * (1 - (Number(p.price) - minP) / range);
+    return { x, y, ...p };
+  });
+
+  const polyline = points.map((p) => `${p.x},${p.y}`).join(" ");
+  const firstPrice = prices[0];
+  const lastPrice = prices[prices.length - 1];
+  const change = ((lastPrice - firstPrice) / firstPrice) * 100;
+  const isUp = change > 0;
+
+  return (
+    <div className="bg-background rounded-xl p-4">
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-xs font-black">روند قیمت</h4>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+          isUp ? "bg-danger/10 text-danger" : "bg-accent/10 text-accent"
+        }`}>
+          {isUp ? "+" : ""}{toPersianDigits(change.toFixed(1))}٪
+        </span>
+      </div>
+
+      <svg viewBox={`0 0 ${W} ${H + 15}`} className="w-full">
+        {[0, 0.5, 1].map((frac) => {
+          const y = PAD + (H - PAD * 2) * (1 - frac);
+          const val = minP + range * frac;
+          return (
+            <g key={frac}>
+              <line x1={PAD} y1={y} x2={W - 10} y2={y} stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="3,3" />
+              <text x={PAD - 2} y={y + 3} textAnchor="end" fill="var(--muted)" fontSize="6" fontFamily="Vazirmatn">
+                {formatPrice(val)}
+              </text>
+            </g>
+          );
+        })}
+
+        <defs>
+          <linearGradient id="priceGradMini" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#2563eb" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {points.length >= 2 && (
+          <polygon
+            fill="url(#priceGradMini)"
+            points={`${points[0].x},${PAD + H - PAD * 2} ${polyline} ${points[points.length - 1].x},${PAD + H - PAD * 2}`}
+          />
+        )}
+
+        <polyline fill="none" stroke="#2563eb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" points={polyline} />
+
+        {points.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r="2" fill="#2563eb" />
+        ))}
+
+        {[0, history.length - 1].map((idx) => {
+          if (!history[idx]) return null;
+          const x = PAD + ((W - PAD - 10) * idx) / Math.max(history.length - 1, 1);
+          return (
+            <text key={idx} x={x} y={H + 8} textAnchor="middle" fill="var(--muted)" fontSize="6" fontFamily="Vazirmatn">
+              {history[idx].date.slice(5)}
+            </text>
+          );
+        })}
+      </svg>
     </div>
   );
 }

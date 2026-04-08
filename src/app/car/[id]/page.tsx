@@ -4,10 +4,12 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { formatPrice, toPersianDigits, getOriginLabel, getCategoryLabel } from "@/lib/utils";
 
+interface PricePoint { date: string; price: string; source: string }
+
 interface CarDetail {
   id: string; nameFa: string; nameEn: string; brandFa: string;
   category: string; origin: string; priceMin: string; priceMax: string;
-  description: string | null; imageUrl: string | null;
+  isNew: boolean; description: string | null; imageUrl: string | null;
   tags: string[];
   scores: Record<string, number> | null;
   specs: { engine: string | null; horsepower: number | null; torque: number | null; transmission: string | null; fuelType: string | null; fuelConsumption: number | null; acceleration: number | null; seatingCapacity: number } | null;
@@ -18,6 +20,7 @@ interface CarDetail {
     purchaseRisk: number; ownerSatisfaction: number;
     suitFamily: number; suitCity: number; suitTravel: number; suitYoung: number; suitInvestment: number;
   } | null;
+  priceHistory: PricePoint[];
   similarCars: { id: string; nameFa: string; brandFa: string; priceMin: string; priceMax: string }[];
   alternatives: { id: string; nameFa: string; brandFa: string; priceMin: string; priceMax: string }[];
 }
@@ -142,7 +145,14 @@ export default function CarDetailPage({ params }: { params: Promise<{ id: string
               </svg>
             )}
             <span className={`absolute top-3 right-3 text-[10px] font-bold px-2.5 py-0.5 rounded-full ${ORIGIN_COLORS[car.origin] || ""}`}>{getOriginLabel(car.origin)}</span>
-            <span className="absolute top-3 left-3 text-[10px] font-bold bg-white/80 dark:bg-black/50 backdrop-blur-sm px-2.5 py-0.5 rounded-full">{getCategoryLabel(car.category)}</span>
+            <div className="absolute top-3 left-3 flex gap-1">
+              <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                car.isNew
+                  ? "bg-emerald-500/90 text-white"
+                  : "bg-orange-500/90 text-white"
+              }`}>{car.isNew ? "صفر" : "کارکرده"}</span>
+              <span className="text-[10px] font-bold bg-white/80 dark:bg-black/50 backdrop-blur-sm px-2.5 py-0.5 rounded-full">{getCategoryLabel(car.category)}</span>
+            </div>
           </div>
 
           {/* Name + Price */}
@@ -253,6 +263,9 @@ export default function CarDetailPage({ params }: { params: Promise<{ id: string
                   </div>
                 </div>
               )}
+
+              {/* Price Chart */}
+              <PriceChartSection history={car.priceHistory} />
 
               {/* Scores */}
               {car.scores && (
@@ -426,6 +439,108 @@ export default function CarDetailPage({ params }: { params: Promise<{ id: string
           لینک کپی شد
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Price Chart Component ──
+function PriceChartSection({ history }: { history: PricePoint[] }) {
+  if (!history || history.length === 0) {
+    return (
+      <div className="bg-surface rounded-xl border border-border p-4">
+        <h4 className="text-xs font-black mb-2">روند قیمت</h4>
+        <div className="text-center py-6">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto text-muted/30 mb-2">
+            <path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" />
+          </svg>
+          <p className="text-[11px] text-muted">داده قیمتی هنوز ثبت نشده</p>
+        </div>
+      </div>
+    );
+  }
+
+  const prices = history.map((p) => Number(p.price));
+  const minP = Math.min(...prices);
+  const maxP = Math.max(...prices);
+  const range = maxP - minP || 1;
+
+  const W = 340;
+  const H = 180;
+  const PAD = 30;
+
+  const points = history.map((p, i) => {
+    const x = PAD + ((W - PAD - 10) * i) / Math.max(history.length - 1, 1);
+    const y = PAD + (H - PAD * 2) * (1 - (Number(p.price) - minP) / range);
+    return { x, y, ...p };
+  });
+
+  const polyline = points.map((p) => `${p.x},${p.y}`).join(" ");
+
+  // Price change
+  const firstPrice = prices[0];
+  const lastPrice = prices[prices.length - 1];
+  const change = ((lastPrice - firstPrice) / firstPrice) * 100;
+  const isUp = change > 0;
+
+  return (
+    <div className="bg-surface rounded-xl border border-border p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-xs font-black">روند قیمت</h4>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+          isUp ? "bg-danger/10 text-danger" : "bg-accent/10 text-accent"
+        }`}>
+          {isUp ? "+" : ""}{toPersianDigits(change.toFixed(1))}٪
+        </span>
+      </div>
+
+      <svg viewBox={`0 0 ${W} ${H + 20}`} className="w-full">
+        {/* Grid */}
+        {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
+          const y = PAD + (H - PAD * 2) * (1 - frac);
+          const val = minP + range * frac;
+          return (
+            <g key={frac}>
+              <line x1={PAD} y1={y} x2={W - 10} y2={y} stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="3,3" />
+              <text x={PAD - 2} y={y + 3} textAnchor="end" fill="var(--muted)" fontSize="7" fontFamily="Vazirmatn">
+                {formatPrice(val)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Area fill */}
+        <defs>
+          <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#2563eb" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {points.length >= 2 && (
+          <polygon
+            fill="url(#priceGrad)"
+            points={`${points[0].x},${PAD + H - PAD * 2} ${polyline} ${points[points.length - 1].x},${PAD + H - PAD * 2}`}
+          />
+        )}
+
+        {/* Line */}
+        <polyline fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={polyline} />
+
+        {/* Points */}
+        {points.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r="2.5" fill="#2563eb" />
+        ))}
+
+        {/* Date labels */}
+        {[0, Math.floor(history.length / 2), history.length - 1].map((idx) => {
+          if (!history[idx] || (idx > 0 && idx === history.length - 1 && history.length <= 2 && idx === Math.floor(history.length / 2))) return null;
+          const x = PAD + ((W - PAD - 10) * idx) / Math.max(history.length - 1, 1);
+          return (
+            <text key={idx} x={x} y={H + 10} textAnchor="middle" fill="var(--muted)" fontSize="7" fontFamily="Vazirmatn">
+              {history[idx].date.slice(5)}
+            </text>
+          );
+        })}
+      </svg>
     </div>
   );
 }

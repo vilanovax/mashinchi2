@@ -15,6 +15,7 @@ interface Car {
   priceMin: string;
   priceMax: string;
   origin: string;
+  isNew: boolean;
   description: string;
   tags: string[];
   scores: {
@@ -365,10 +366,17 @@ function ExploreContent() {
               {getOriginLabel(currentCar.origin)}
             </span>
 
-            {/* Category badge */}
-            <span className="absolute top-2.5 left-2.5 text-[10px] bg-white/60 dark:bg-black/40 backdrop-blur-sm text-foreground px-2 py-0.5 rounded-full font-bold">
-              {getCategoryLabel(currentCar.category)}
-            </span>
+            {/* Category + Condition badges */}
+            <div className="absolute top-2.5 left-2.5 flex gap-1">
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                currentCar.isNew
+                  ? "bg-emerald-500/90 text-white"
+                  : "bg-orange-500/90 text-white"
+              }`}>{currentCar.isNew ? "صفر" : "کارکرده"}</span>
+              <span className="text-[10px] bg-white/60 dark:bg-black/40 backdrop-blur-sm text-foreground px-2 py-0.5 rounded-full font-bold">
+                {getCategoryLabel(currentCar.category)}
+              </span>
+            </div>
 
             {/* Swipe hint on first card */}
             {totalInteractions === 0 && (

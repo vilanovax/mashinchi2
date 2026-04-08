@@ -1,12 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
+import { randomUUID } from "crypto";
 
 async function getUser() {
   const cookieStore = await cookies();
   const sessionId = cookieStore.get("mashinchi_session")?.value;
   if (!sessionId) return null;
   return prisma.user.findUnique({ where: { sessionId } });
+}
+
+async function getOrCreateUser() {
+  const cookieStore = await cookies();
+  let sessionId = cookieStore.get("mashinchi_session")?.value;
+
+  if (sessionId) {
+    const existing = await prisma.user.findUnique({ where: { sessionId } });
+    if (existing) return { user: existing, sessionId, isNew: false };
+  }
+
+  sessionId = randomUUID();
+  const user = await prisma.user.create({ data: { sessionId } });
+  return { user, sessionId, isNew: true };
 }
 
 // GET - list user's favorites
@@ -59,30 +74,38 @@ export async function GET() {
 
 // POST - toggle favorite
 export async function POST(request: NextRequest) {
-  const user = await getUser();
-  if (!user) {
-    return NextResponse.json({ error: "No session" }, { status: 400 });
-  }
-
   const { carId } = await request.json();
   if (!carId) {
     return NextResponse.json({ error: "carId required" }, { status: 400 });
   }
+
+  const { user, sessionId, isNew } = await getOrCreateUser();
 
   // Check if already favorited
   const existing = await prisma.userInteraction.findFirst({
     where: { userId: user.id, carId, action: "favorite" },
   });
 
+  let response: NextResponse;
   if (existing) {
-    // Remove favorite
     await prisma.userInteraction.delete({ where: { id: existing.id } });
-    return NextResponse.json({ favorited: false });
+    response = NextResponse.json({ favorited: false });
   } else {
-    // Add favorite
     await prisma.userInteraction.create({
       data: { userId: user.id, carId, action: "favorite" },
     });
-    return NextResponse.json({ favorited: true });
+    response = NextResponse.json({ favorited: true });
   }
+
+  if (isNew) {
+    response.cookies.set("mashinchi_session", sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 365,
+      path: "/",
+    });
+  }
+
+  return response;
 }
