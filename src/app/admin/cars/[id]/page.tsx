@@ -215,7 +215,7 @@ export default function AdminCarEditPage({ params }: { params: Promise<{ id: str
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.push("/admin/cars")} className="p-1 text-muted hover:text-foreground">
+          <button onClick={() => router.push("/admin/cars")} className="p-1 text-muted hover:text-foreground" title="بازگشت به خودروها">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
@@ -224,6 +224,13 @@ export default function AdminCarEditPage({ params }: { params: Promise<{ id: str
             <h1 className="text-lg font-black">{car.nameFa}</h1>
             <p className="text-xs text-muted">{car.nameEn} | {car.brandFa}</p>
           </div>
+          <button
+            onClick={() => router.push("/admin/prices")}
+            className="mr-2 px-2.5 py-1 text-[10px] font-bold text-primary bg-primary/5 border border-primary/15 rounded-lg hover:bg-primary/10 transition-colors flex items-center gap-1"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0-6C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" /></svg>
+            قیمت‌ها
+          </button>
         </div>
         <button
           onClick={handleSave}
