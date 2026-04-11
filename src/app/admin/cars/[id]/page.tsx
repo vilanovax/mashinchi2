@@ -231,6 +231,13 @@ export default function AdminCarEditPage({ params }: { params: Promise<{ id: str
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0-6C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" /></svg>
             قیمت‌ها
           </button>
+          <button
+            onClick={() => router.push(`/admin/cars/${id}/data`)}
+            className="px-2.5 py-1 text-[10px] font-bold text-accent bg-accent/5 border border-accent/15 rounded-lg hover:bg-accent/10 transition-colors flex items-center gap-1"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z M14 2v6h6 M16 13H8 M16 17H8" /></svg>
+            دیتای خام
+          </button>
         </div>
         <button
           onClick={handleSave}

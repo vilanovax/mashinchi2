@@ -29,8 +29,21 @@ const SITE_CONFIG: Record<string, { label: string; color: string }> = {
   divar: { label: "دیوار", color: "text-red-600 bg-red-500/10" },
   zoomit: { label: "زومیت", color: "text-purple-600 bg-purple-500/10" },
   charkhan: { label: "چرخان", color: "text-emerald-600 bg-emerald-500/10" },
+  youtube: { label: "یوتیوب", color: "text-red-600 bg-red-500/10" },
+  aparat: { label: "آپارات", color: "text-rose-600 bg-rose-500/10" },
   blog: { label: "بلاگ", color: "text-amber-600 bg-amber-500/10" },
   manual: { label: "دستی", color: "text-muted bg-background" },
+};
+
+const TYPE_CONFIG: Record<string, { label: string }> = {
+  comment: { label: "تجربه کاربری" },
+  article: { label: "مقاله" },
+  review: { label: "ریویو تخصصی" },
+  video: { label: "ویدیو" },
+  comparison: { label: "مقایسه" },
+  forum: { label: "فروم" },
+  expert: { label: "نظر کارشناس" },
+  manual: { label: "دستی" },
 };
 
 type AddMode = "url" | "text";
@@ -252,6 +265,7 @@ export default function AdminSourcesPage() {
           const isExpanded = expandedId === src.id;
           const stCfg = STATUS_CONFIG[src.status] || STATUS_CONFIG.pending;
           const siteCfg = SITE_CONFIG[src.sourceSite] || SITE_CONFIG.manual;
+          const typeCfg = TYPE_CONFIG[src.type] || TYPE_CONFIG.manual;
           const scores = src.extractedScores ? JSON.parse(src.extractedScores) : null;
 
           return (
@@ -262,6 +276,7 @@ export default function AdminSourcesPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-bold">{src.carName}</span>
+                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-foreground/5 text-muted">{typeCfg.label}</span>
                     <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${siteCfg.color}`}>{siteCfg.label}</span>
                     {src.title && <span className="text-[10px] text-muted truncate max-w-[250px]">{src.title}</span>}
                   </div>
@@ -604,10 +619,10 @@ export default function AdminSourcesPage() {
                 </select>
                 <div className="grid grid-cols-2 gap-3">
                   <select value={newType} onChange={(e) => setNewType(e.target.value)} className="bg-background border border-border rounded-lg px-3 py-2 text-sm outline-none">
-                    <option value="comment">نظر کاربر</option><option value="article">مقاله</option><option value="review">ریویو</option><option value="manual">دستی</option>
+                    {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                   </select>
                   <select value={newSite} onChange={(e) => setNewSite(e.target.value)} className="bg-background border border-border rounded-lg px-3 py-2 text-sm outline-none">
-                    <option value="manual">دستی</option><option value="bama">باما</option><option value="divar">دیوار</option><option value="zoomit">زومیت</option><option value="charkhan">چرخان</option><option value="blog">بلاگ</option>
+                    {Object.entries(SITE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                   </select>
                 </div>
                 <input value={newUrl} onChange={(e) => setNewUrl(e.target.value)} placeholder="لینک منبع (اختیاری)" dir="ltr" className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm outline-none" />
