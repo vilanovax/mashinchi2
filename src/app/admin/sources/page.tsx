@@ -48,6 +48,45 @@ const TYPE_CONFIG: Record<string, { label: string }> = {
 
 type AddMode = "url" | "text";
 
+// ─── Diff helpers for merge preview ───
+function diffArrays(oldArr: string[], newArr: string[]): {
+  added: string[];
+  removed: string[];
+  same: string[];
+} {
+  const normalize = (s: string) => s.trim().toLowerCase();
+  const oldNorm = new Map(oldArr.map((s) => [normalize(s), s]));
+  const newNorm = new Map(newArr.map((s) => [normalize(s), s]));
+
+  const added: string[] = [];
+  const same: string[] = [];
+  for (const [k, v] of newNorm) {
+    if (oldNorm.has(k)) same.push(v);
+    else added.push(v);
+  }
+  const removed: string[] = [];
+  for (const [k, v] of oldNorm) {
+    if (!newNorm.has(k)) removed.push(v);
+  }
+  return { added, removed, same };
+}
+
+function diffSentences(oldText: string, newText: string): {
+  added: string[];
+  removed: string[];
+  same: string[];
+} {
+  // Split by sentence-ending punctuation (Persian . ! ؟ + newline)
+  const split = (t: string) => t
+    .split(/[.!?؟\n]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 3);
+
+  const oldSentences = split(oldText || "");
+  const newSentences = split(newText || "");
+  return diffArrays(oldSentences, newSentences);
+}
+
 export default function AdminSourcesPage() {
   const { fetchAdmin } = useAdmin();
   const [sources, setSources] = useState<Source[]>([]);
@@ -59,6 +98,33 @@ export default function AdminSourcesPage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  // Merge state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [mergeLoading, setMergeLoading] = useState(false);
+  const [mergeApplying, setMergeApplying] = useState(false);
+  type MergePreview = {
+    success: boolean;
+    carId: string;
+    carName: string;
+    sourcesUsed: { id: string; type: string; sourceSite: string; title: string | null; textLength: number }[];
+    mergeReasoning: string;
+    diff: {
+      overallSummary: { old: string; new: string };
+      whyBuy: { old: string; new: string };
+      whyNotBuy: { old: string; new: string };
+      ownerVerdict: { old: string; new: string };
+      frequentPros: { old: string[]; new: string[] };
+      frequentCons: { old: string[]; new: string[] };
+      commonIssues: { old: string[]; new: string[] };
+      purchaseWarnings: { old: string[]; new: string[] };
+      ownerSatisfaction: { old: number; new: number };
+      purchaseRisk: { old: number; new: number };
+      scores: Record<string, { old: number; new: number; changed: boolean }>;
+      scoresChanged: number;
+    };
+  };
+  const [mergePreview, setMergePreview] = useState<MergePreview | null>(null);
 
   // Add modal
   const [showAdd, setShowAdd] = useState(false);
@@ -94,6 +160,84 @@ export default function AdminSourcesPage() {
   }, []);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
+
+  // Toggle source selection for merge
+  const toggleSelect = (src: Source) => {
+    // Only processed/approved can be merged (raw pending sources have no AI extraction)
+    if (src.status !== "processed" && src.status !== "approved") {
+      showToast("فقط منابع پردازش‌شده یا تایید‌شده قابل ترکیب هستند");
+      return;
+    }
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(src.id)) {
+        next.delete(src.id);
+      } else {
+        // Enforce single-car rule
+        const first = sources.find((s) => next.has(s.id));
+        if (first && first.carId !== src.carId) {
+          showToast("فقط منابع یک خودرو قابل ترکیب هستند");
+          return prev;
+        }
+        next.add(src.id);
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  // Request merge preview from AI
+  const handleMergePreview = async () => {
+    if (selectedIds.size < 2) {
+      showToast("حداقل ۲ منبع انتخاب کنید");
+      return;
+    }
+    setMergeLoading(true);
+    try {
+      const res = await fetchAdmin("/api/admin/sources/merge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceIds: Array.from(selectedIds), apply: false }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMergePreview(data);
+      } else {
+        showToast(data.error || "خطا در ترکیب");
+      }
+    } catch {
+      showToast("خطا در اتصال");
+    }
+    setMergeLoading(false);
+  };
+
+  // Apply the previewed merge
+  const handleMergeApply = async () => {
+    if (!mergePreview) return;
+    setMergeApplying(true);
+    try {
+      const res = await fetchAdmin("/api/admin/sources/merge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceIds: Array.from(selectedIds), apply: true }),
+      });
+      const data = await res.json();
+      if (data.success && data.applied) {
+        showToast(`تحلیل جدید اعمال شد - ${toPersianDigits(data.sourcesApproved)} منبع تایید شد`);
+        // Refresh sources
+        const updated = await fetchAdmin("/api/admin/sources").then((r) => r.json());
+        setSources(updated);
+        setMergePreview(null);
+        clearSelection();
+      } else {
+        showToast(data.error || "خطا در اعمال");
+      }
+    } catch {
+      showToast("خطا در اتصال");
+    }
+    setMergeApplying(false);
+  };
 
   const filtered = useMemo(() => {
     return sources.filter((s) => {
@@ -268,10 +412,32 @@ export default function AdminSourcesPage() {
           const typeCfg = TYPE_CONFIG[src.type] || TYPE_CONFIG.manual;
           const scores = src.extractedScores ? JSON.parse(src.extractedScores) : null;
 
+          const isSelected = selectedIds.has(src.id);
+          const canSelect = src.status === "processed" || src.status === "approved";
+
           return (
-            <div key={src.id} className={`bg-surface rounded-xl border overflow-hidden transition-colors ${src.status === "approved" ? "border-accent/20" : "border-border"}`}>
+            <div key={src.id} className={`bg-surface rounded-xl border overflow-hidden transition-colors ${
+              isSelected ? "border-primary ring-1 ring-primary/30" :
+              src.status === "approved" ? "border-accent/20" : "border-border"
+            }`}>
               {/* Row */}
               <div onClick={() => setExpandedId(isExpanded ? null : src.id)} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-background/30 transition-colors">
+                {/* Selection checkbox (only for processed/approved) */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleSelect(src); }}
+                  disabled={!canSelect}
+                  title={canSelect ? "انتخاب برای ترکیب" : "ابتدا منبع را پردازش کنید"}
+                  className={`w-4 h-4 shrink-0 rounded border-2 flex items-center justify-center transition-all ${
+                    isSelected ? "bg-primary border-primary" :
+                    canSelect ? "border-border hover:border-primary" : "border-border/30 opacity-30 cursor-not-allowed"
+                  }`}
+                >
+                  {isSelected && (
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                  )}
+                </button>
                 <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full shrink-0 ${stCfg.bg} ${stCfg.color}`}>{stCfg.label}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
@@ -645,6 +811,446 @@ export default function AdminSourcesPage() {
           </div>
         </>
       )}
+
+      {/* ─── Merge Floating Bar ─── */}
+      {selectedIds.size > 0 && !mergePreview && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-foreground text-background rounded-2xl shadow-2xl z-40 flex items-center gap-3 pr-4 pl-2 py-2 animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
+              <span className="text-xs font-black text-white">{toPersianDigits(selectedIds.size)}</span>
+            </div>
+            <span className="text-[11px] font-bold">منبع انتخاب‌شده برای ترکیب</span>
+          </div>
+          <div className="h-6 w-px bg-background/20" />
+          <button
+            onClick={handleMergePreview}
+            disabled={mergeLoading || selectedIds.size < 2}
+            className="px-3 py-1.5 bg-primary text-white text-[11px] font-bold rounded-xl disabled:opacity-40 flex items-center gap-1.5"
+          >
+            {mergeLoading ? (
+              <>
+                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                در حال ترکیب با AI...
+              </>
+            ) : (
+              <>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
+                پیش‌نمایش ترکیب
+              </>
+            )}
+          </button>
+          <button
+            onClick={clearSelection}
+            className="p-1.5 text-background/60 hover:text-background"
+            title="لغو انتخاب"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* ─── Merge Preview Modal ─── */}
+      {mergePreview && (() => {
+        // Compute aggregated diff stats for the header summary
+        const textFields = [
+          { key: "overallSummary", label: "جمع‌بندی کلی" },
+          { key: "whyBuy",         label: "چرا بخری" },
+          { key: "whyNotBuy",      label: "چرا نخری" },
+          { key: "ownerVerdict",   label: "نظر مالکان" },
+        ] as const;
+
+        const arrayFields = [
+          { key: "frequentPros",     label: "نقاط قوت پرتکرار",   tone: "emerald" },
+          { key: "frequentCons",     label: "نقاط ضعف پرتکرار",   tone: "red" },
+          { key: "commonIssues",     label: "خرابی‌های رایج",     tone: "amber" },
+          { key: "purchaseWarnings", label: "هشدارهای خرید",      tone: "rose" },
+        ] as const;
+
+        let textChanged = 0;
+        let totalAdded = 0;
+        let totalRemoved = 0;
+
+        for (const tf of textFields) {
+          const d = mergePreview.diff[tf.key];
+          if ((d.old || "").trim() !== (d.new || "").trim()) textChanged++;
+        }
+        for (const af of arrayFields) {
+          const d = mergePreview.diff[af.key];
+          const arr = diffArrays(d.old, d.new);
+          totalAdded += arr.added.length;
+          totalRemoved += arr.removed.length;
+        }
+        const scoresChanged = mergePreview.diff.scoresChanged;
+
+        return (
+        <>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" onClick={() => !mergeApplying && setMergePreview(null)} />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface rounded-2xl z-50 shadow-2xl w-[900px] max-h-[92vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-black">پیش‌نمایش تحلیل ترکیبی</h3>
+                  <p className="text-[10px] text-muted">
+                    {mergePreview.carName} · {toPersianDigits(mergePreview.sourcesUsed.length)} منبع ترکیب شد
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setMergePreview(null)} disabled={mergeApplying} className="w-7 h-7 rounded-lg hover:bg-background text-muted hover:text-foreground flex items-center justify-center disabled:opacity-30">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-4 overflow-y-auto flex-1 space-y-4">
+
+              {/* ─── Stats Summary ─── */}
+              <div className="grid grid-cols-4 gap-2">
+                <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-2.5">
+                  <div className="text-[9px] text-muted mb-0.5">متن‌های تغییر کرده</div>
+                  <div className="text-lg font-black text-amber-600">{toPersianDigits(textChanged)}<span className="text-[10px] text-muted font-normal"> از {toPersianDigits(textFields.length)}</span></div>
+                </div>
+                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-2.5">
+                  <div className="text-[9px] text-muted mb-0.5">آیتم‌های اضافه‌شده</div>
+                  <div className="text-lg font-black text-emerald-600">+{toPersianDigits(totalAdded)}</div>
+                </div>
+                <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-2.5">
+                  <div className="text-[9px] text-muted mb-0.5">آیتم‌های حذف‌شده</div>
+                  <div className="text-lg font-black text-red-500">-{toPersianDigits(totalRemoved)}</div>
+                </div>
+                <div className="bg-primary/5 border border-primary/20 rounded-xl p-2.5">
+                  <div className="text-[9px] text-muted mb-0.5">امتیازات تغییر کرده</div>
+                  <div className="text-lg font-black text-primary">{toPersianDigits(scoresChanged)}<span className="text-[10px] text-muted font-normal"> از ۱۴</span></div>
+                </div>
+              </div>
+
+              {/* Merge reasoning */}
+              {mergePreview.mergeReasoning && (
+                <div className="bg-primary/5 border border-primary/15 rounded-xl p-3">
+                  <div className="text-[10px] font-bold text-primary mb-1 flex items-center gap-1">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>
+                    منطق ترکیب AI
+                  </div>
+                  <p className="text-[11px] leading-6 text-foreground">{mergePreview.mergeReasoning}</p>
+                </div>
+              )}
+
+              {/* Sources used */}
+              <div>
+                <h4 className="text-[10px] font-black text-muted mb-1.5">منابع مشارکت‌کننده</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {mergePreview.sourcesUsed.map((s) => (
+                    <span key={s.id} className="text-[9px] bg-background border border-border rounded-full px-2 py-0.5 flex items-center gap-1">
+                      <span className="font-bold">{TYPE_CONFIG[s.type]?.label || s.type}</span>
+                      <span className="text-muted/60">·</span>
+                      <span className="text-muted">{s.sourceSite}</span>
+                      <span className="text-muted/60">·</span>
+                      <span className="text-muted">{toPersianDigits(s.textLength)} ک</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* ─── Text Fields Section ─── */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z M14 2v6h6 M16 13H8 M16 17H8" />
+                  </svg>
+                  <h3 className="text-[11px] font-black">متن‌های جمع‌بندی</h3>
+                  <span className="text-[9px] bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full font-bold">
+                    {toPersianDigits(textChanged)} تغییر
+                  </span>
+                </div>
+                <div className="space-y-2.5">
+                  {textFields.map(({ key, label }) => {
+                    const diff = mergePreview.diff[key];
+                    const hasOld = diff.old && diff.old.trim().length > 0;
+                    const isSame = (diff.old || "").trim() === (diff.new || "").trim();
+
+                    // Case 1: empty before → full-width new card
+                    if (!hasOld) {
+                      return (
+                        <div key={key} className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3">
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <span className="text-[10px] font-bold text-foreground">{label}</span>
+                            <span className="text-[8px] bg-emerald-500/15 text-emerald-600 px-1.5 py-0.5 rounded-full font-bold">جدید</span>
+                          </div>
+                          <p className="text-[11px] leading-6 text-foreground">{diff.new || "—"}</p>
+                        </div>
+                      );
+                    }
+
+                    // Case 2: unchanged
+                    if (isSame) {
+                      return (
+                        <div key={key} className="bg-background/30 border border-border/50 rounded-xl p-3">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="text-[10px] font-bold text-muted/80">{label}</span>
+                            <span className="text-[8px] bg-muted/10 text-muted px-1.5 py-0.5 rounded-full">بدون تغییر</span>
+                          </div>
+                          <p className="text-[10px] leading-5 text-muted/70 line-clamp-2">{diff.old}</p>
+                        </div>
+                      );
+                    }
+
+                    // Case 3: changed → sentence-level diff
+                    const sent = diffSentences(diff.old, diff.new);
+                    return (
+                      <div key={key} className="bg-surface border border-amber-500/30 rounded-xl p-3">
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <span className="text-[10px] font-bold text-foreground">{label}</span>
+                          <span className="text-[8px] bg-amber-500/15 text-amber-600 px-1.5 py-0.5 rounded-full font-bold">تغییر</span>
+                          <span className="text-[8px] text-muted/80">
+                            +{toPersianDigits(sent.added.length)} / -{toPersianDigits(sent.removed.length)} / ={toPersianDigits(sent.same.length)}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          {sent.added.map((s, i) => (
+                            <div key={`a${i}`} className="flex items-start gap-1.5 text-[10px] leading-5">
+                              <span className="text-emerald-600 font-black shrink-0">+</span>
+                              <span className="text-emerald-700 dark:text-emerald-400 flex-1">{s}</span>
+                            </div>
+                          ))}
+                          {sent.removed.map((s, i) => (
+                            <div key={`r${i}`} className="flex items-start gap-1.5 text-[10px] leading-5">
+                              <span className="text-red-500 font-black shrink-0">−</span>
+                              <span className="text-red-500/80 line-through flex-1">{s}</span>
+                            </div>
+                          ))}
+                          {sent.same.length > 0 && (
+                            <details className="mt-1">
+                              <summary className="text-[9px] text-muted cursor-pointer hover:text-foreground">
+                                {toPersianDigits(sent.same.length)} جمله بدون تغییر
+                              </summary>
+                              <div className="space-y-0.5 mt-1 pr-3">
+                                {sent.same.map((s, i) => (
+                                  <div key={`s${i}`} className="flex items-start gap-1.5 text-[10px] leading-5">
+                                    <span className="text-muted/60 shrink-0">=</span>
+                                    <span className="text-muted/70 flex-1">{s}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ─── Array Fields Section ─── */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted">
+                    <path d="M8 6h13M8 12h13M8 18h13 M3 6h.01M3 12h.01M3 18h.01" />
+                  </svg>
+                  <h3 className="text-[11px] font-black">لیست‌ها</h3>
+                  <span className="text-[9px] bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full font-bold">+{toPersianDigits(totalAdded)}</span>
+                  <span className="text-[9px] bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full font-bold">-{toPersianDigits(totalRemoved)}</span>
+                </div>
+                <div className="space-y-2">
+                  {arrayFields.map(({ key, label, tone }) => {
+                    const diff = mergePreview.diff[key];
+                    const arr = diffArrays(diff.old, diff.new);
+                    const toneText = tone === "emerald" ? "text-emerald-600" :
+                                     tone === "red" ? "text-red-500" :
+                                     tone === "amber" ? "text-amber-600" : "text-rose-500";
+
+                    const isEmpty = arr.added.length === 0 && arr.removed.length === 0 && arr.same.length === 0;
+                    if (isEmpty) return null;
+
+                    return (
+                      <div key={key} className="bg-background/30 border border-border/60 rounded-xl p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`text-[10px] font-black ${toneText}`}>{label}</span>
+                          <div className="flex gap-1">
+                            {arr.added.length > 0 && (
+                              <span className="text-[8px] bg-emerald-500/15 text-emerald-600 px-1.5 py-0.5 rounded-full font-bold">
+                                +{toPersianDigits(arr.added.length)} اضافه
+                              </span>
+                            )}
+                            {arr.removed.length > 0 && (
+                              <span className="text-[8px] bg-red-500/15 text-red-500 px-1.5 py-0.5 rounded-full font-bold">
+                                -{toPersianDigits(arr.removed.length)} حذف
+                              </span>
+                            )}
+                            {arr.same.length > 0 && (
+                              <span className="text-[8px] bg-muted/10 text-muted px-1.5 py-0.5 rounded-full">
+                                {toPersianDigits(arr.same.length)} ثابت
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="space-y-0.5">
+                          {arr.added.map((item, i) => (
+                            <div key={`a${i}`} className="flex items-start gap-1.5 text-[10px] leading-5 bg-emerald-500/5 rounded px-2 py-1">
+                              <span className="text-emerald-600 font-black shrink-0">+</span>
+                              <span className="text-emerald-700 dark:text-emerald-400 font-bold flex-1">{item}</span>
+                            </div>
+                          ))}
+                          {arr.removed.map((item, i) => (
+                            <div key={`r${i}`} className="flex items-start gap-1.5 text-[10px] leading-5 bg-red-500/5 rounded px-2 py-1">
+                              <span className="text-red-500 font-black shrink-0">−</span>
+                              <span className="text-red-500/80 line-through flex-1">{item}</span>
+                            </div>
+                          ))}
+                          {arr.same.length > 0 && (
+                            <details>
+                              <summary className="text-[9px] text-muted cursor-pointer hover:text-foreground px-2 py-0.5">
+                                نمایش {toPersianDigits(arr.same.length)} آیتم بدون تغییر
+                              </summary>
+                              <div className="space-y-0.5 mt-0.5">
+                                {arr.same.map((item, i) => (
+                                  <div key={`s${i}`} className="flex items-start gap-1.5 text-[10px] leading-5 px-2 py-0.5">
+                                    <span className="text-muted/60 shrink-0">=</span>
+                                    <span className="text-muted/70 flex-1">{item}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ─── Scores Section ─── */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                  <h3 className="text-[11px] font-black">امتیازات</h3>
+                  {scoresChanged > 0 && (
+                    <span className="text-[9px] bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full font-bold">
+                      {toPersianDigits(scoresChanged)} تغییر
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {Object.entries(mergePreview.diff.scores).map(([key, s]) => {
+                    const delta = s.new - s.old;
+                    const deltaColor = delta > 0 ? "text-emerald-600" : delta < 0 ? "text-red-500" : "text-muted";
+                    return (
+                      <div key={key} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg ${s.changed ? "bg-amber-500/5 border border-amber-500/20" : "bg-background/30 border border-border/40"}`}>
+                        <span className="text-[9px] text-muted w-20 shrink-0">{key}</span>
+                        {/* Dual bar */}
+                        <div className="flex-1 flex items-center gap-1">
+                          <div className="flex-1 h-1.5 bg-background rounded-full relative overflow-hidden">
+                            <div className="absolute inset-y-0 right-0 bg-muted/40 rounded-full" style={{ width: `${s.old * 10}%` }} />
+                            {s.changed && (
+                              <div
+                                className={`absolute inset-y-0 right-0 ${delta > 0 ? "bg-emerald-500" : "bg-red-500"} rounded-full`}
+                                style={{ width: `${s.new * 10}%`, opacity: 0.8 }}
+                              />
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <span className="text-[9px] text-muted">{toPersianDigits(s.old)}</span>
+                          {s.changed && (
+                            <>
+                              <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-muted/50">
+                                <path d="M5 12h14M12 5l7 7-7 7" />
+                              </svg>
+                              <span className={`text-[10px] font-black ${deltaColor}`}>{toPersianDigits(s.new)}</span>
+                              <span className={`text-[8px] font-bold ${deltaColor}`}>
+                                ({delta > 0 ? "+" : ""}{toPersianDigits(delta)})
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Owner satisfaction + Purchase risk */}
+                <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+                  {([
+                    { key: "ownerSatisfaction", label: "رضایت مالکان", positive: true },
+                    { key: "purchaseRisk", label: "ریسک خرید", positive: false },
+                  ] as const).map(({ key, label, positive }) => {
+                    const d = mergePreview.diff[key];
+                    const changed = d.old !== d.new;
+                    const delta = d.new - d.old;
+                    const goodChange = positive ? delta > 0 : delta < 0;
+                    const deltaColor = !changed ? "text-muted" : goodChange ? "text-emerald-600" : "text-red-500";
+                    return (
+                      <div key={key} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg ${changed ? "bg-amber-500/5 border border-amber-500/20" : "bg-background/30 border border-border/40"}`}>
+                        <span className="text-[9px] text-muted flex-1">{label}</span>
+                        <div className="flex items-center gap-0.5">
+                          <span className="text-[9px] text-muted">{toPersianDigits(d.old)}</span>
+                          {changed && (
+                            <>
+                              <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-muted/50">
+                                <path d="M5 12h14M12 5l7 7-7 7" />
+                              </svg>
+                              <span className={`text-[10px] font-black ${deltaColor}`}>{toPersianDigits(d.new)}</span>
+                              <span className={`text-[8px] font-bold ${deltaColor}`}>
+                                ({delta > 0 ? "+" : ""}{toPersianDigits(delta)})
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center gap-2 px-5 py-3 border-t border-border bg-background/30">
+              <button
+                onClick={() => setMergePreview(null)}
+                disabled={mergeApplying}
+                className="px-4 py-2 text-[11px] font-bold text-muted hover:text-foreground disabled:opacity-30"
+              >
+                انصراف
+              </button>
+              <div className="mr-auto flex items-center gap-2">
+                <span className="text-[10px] text-muted">
+                  این تحلیل جایگزین intel فعلی می‌شود و منابع تایید می‌شوند
+                </span>
+                <button
+                  onClick={handleMergeApply}
+                  disabled={mergeApplying}
+                  className="px-4 py-2 bg-primary text-white text-[11px] font-bold rounded-xl disabled:opacity-40 flex items-center gap-1.5 shadow-sm shadow-primary/20"
+                >
+                  {mergeApplying ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      در حال اعمال...
+                    </>
+                  ) : (
+                    <>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                      تایید و جایگزینی
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+        );
+      })()}
 
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-foreground text-background text-xs font-bold px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
     </div>

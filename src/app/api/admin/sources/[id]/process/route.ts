@@ -10,6 +10,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!session) return unauthorizedResponse();
   const { id } = await params;
 
+  try {
   const source = await prisma.carSource.findUnique({
     where: { id },
     include: {
@@ -24,30 +25,37 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   });
 
   if (!source) return NextResponse.json({ error: "Source not found" }, { status: 404 });
+  if (!source.rawText || source.rawText.trim().length < 20) {
+    return NextResponse.json({ error: "متن منبع خیلی کوتاه است (حداقل ۲۰ کاراکتر)" }, { status: 400 });
+  }
 
   const car = source.car;
   const existingIntel = car.intel;
-  const existingReviews = car.reviews;
+  const existingReviews = car.reviews || [];
   const existingScores = car.scores;
+
+  // Safe array helpers — intel array fields might be empty in DB
+  const safeJoin = (arr: string[] | null | undefined) =>
+    Array.isArray(arr) && arr.length > 0 ? arr.join(" | ") : "—";
 
   // Build context of existing data for AI
   const existingContext = `
 === داده‌های فعلی این خودرو ===
-${existingIntel ? `جمع‌بندی فعلی: ${existingIntel.overallSummary}
-چرا بخری: ${existingIntel.whyBuy}
-چرا نخری: ${existingIntel.whyNotBuy}
-نقاط قوت فعلی: ${existingIntel.frequentPros.join(" | ")}
-نقاط ضعف فعلی: ${existingIntel.frequentCons.join(" | ")}
-خرابی‌های رایج: ${existingIntel.commonIssues.join(" | ")}
-هشدارها: ${existingIntel.purchaseWarnings.join(" | ")}
-نظر مالکان: ${existingIntel.ownerVerdict}
-رضایت مالکان: ${existingIntel.ownerSatisfaction}/10
-ریسک خرید: ${existingIntel.purchaseRisk}/10` : "هیچ اطلاعات هوشمندی ثبت نشده."}
+${existingIntel ? `جمع‌بندی فعلی: ${existingIntel.overallSummary || "—"}
+چرا بخری: ${existingIntel.whyBuy || "—"}
+چرا نخری: ${existingIntel.whyNotBuy || "—"}
+نقاط قوت فعلی: ${safeJoin(existingIntel.frequentPros)}
+نقاط ضعف فعلی: ${safeJoin(existingIntel.frequentCons)}
+خرابی‌های رایج: ${safeJoin(existingIntel.commonIssues)}
+هشدارها: ${safeJoin(existingIntel.purchaseWarnings)}
+نظر مالکان: ${existingIntel.ownerVerdict || "—"}
+رضایت مالکان: ${existingIntel.ownerSatisfaction ?? 5}/10
+ریسک خرید: ${existingIntel.purchaseRisk ?? 5}/10` : "هیچ اطلاعات هوشمندی ثبت نشده."}
 
 ${existingScores ? `امتیازات فعلی: راحتی ${existingScores.comfort}, عملکرد ${existingScores.performance}, اقتصادی ${existingScores.economy}, ایمنی ${existingScores.safety}, پرستیژ ${existingScores.prestige}, اطمینان ${existingScores.reliability}, نقدشوندگی ${existingScores.resaleValue}, خانوادگی ${existingScores.familyFriendly}, اسپرت ${existingScores.sportiness}, آفرود ${existingScores.offroad}, شهری ${existingScores.cityDriving}, سفر ${existingScores.longTrip}, ریسک نگهداری ${existingScores.maintenanceRisk}, خدمات ${existingScores.afterSales}` : ""}
 
 ${existingReviews.length > 0 ? `نظرات موجود (${existingReviews.length} عدد):
-${existingReviews.slice(0, 3).map((r, i) => `${i + 1}. [${r.source}] ${r.summary.slice(0, 100)}`).join("\n")}` : "نظری ثبت نشده."}
+${existingReviews.slice(0, 3).map((r, i) => `${i + 1}. [${r.source}] ${(r.summary || "").slice(0, 100)}`).join("\n")}` : "نظری ثبت نشده."}
 `;
 
   const prompt = `تو یک تحلیلگر ارشد خودرو هستی. یک متن جدید درباره ${car.nameFa} (${car.nameEn}) - ${car.brandFa} داری.
@@ -136,41 +144,58 @@ ${source.rawText.slice(0, 5000)}
 - صادقانه بگو اگر متن چیز مفید جدیدی نداره
 - فقط JSON خالص`;
 
-  try {
     const text = await callAI(prompt, 3000);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      return NextResponse.json({ error: "Failed to parse AI response", raw: text.slice(0, 500) }, { status: 500 });
+      console.error("[sources/process] AI returned no JSON:", text.slice(0, 500));
+      return NextResponse.json({ error: "پاسخ AI قابل پارس نیست", raw: text.slice(0, 500) }, { status: 500 });
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    interface ParsedAI {
+      deepSummary?: string;
+      newInsights?: string[];
+      confirmedFacts?: string[];
+      contradictions?: string[];
+      extractedPros?: string[];
+      extractedCons?: string[];
+      extractedIssues?: string[];
+      extractedWarnings?: string[];
+      scores?: Record<string, { value: number; reason: string } | number>;
+      rating?: number;
+      ownerSatisfaction?: { value: number; reason: string } | number;
+      purchaseRisk?: { value: number; reason: string } | number;
+      recommendation?: string;
+    }
+
+    let parsed: ParsedAI;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch (parseErr) {
+      console.error("[sources/process] JSON parse failed:", parseErr, "raw:", jsonMatch[0].slice(0, 500));
+      return NextResponse.json({ error: "JSON نامعتبر از AI", raw: jsonMatch[0].slice(0, 500) }, { status: 500 });
+    }
 
     // Build score values and comparisons
     const scoreComparisons: Record<string, { old: number; new: number; reason: string; changed: boolean }> = {};
     const scoreValues: Record<string, number> = {};
 
     for (const [key, val] of Object.entries(parsed.scores || {})) {
-      const scoreData = val as { value: number; reason: string };
       const oldVal = existingScores ? (existingScores as unknown as Record<string, number>)[key] || 5 : 5;
-      const newVal = typeof scoreData === "object" ? scoreData.value : (scoreData as number);
-      scoreComparisons[key] = {
-        old: oldVal,
-        new: newVal,
-        reason: typeof scoreData === "object" ? scoreData.reason : "",
-        changed: oldVal !== newVal,
-      };
+      const newVal = typeof val === "object" ? val.value : val;
+      const reason = typeof val === "object" ? val.reason : "";
+      scoreComparisons[key] = { old: oldVal, new: newVal, reason, changed: oldVal !== newVal };
       scoreValues[key] = newVal;
     }
 
     // Build extracted scores JSON with flat values for storage
     const flatScores: Record<string, number> = { ...scoreValues };
-    if (parsed.ownerSatisfaction) {
+    if (parsed.ownerSatisfaction !== undefined) {
       flatScores.ownerSatisfaction = typeof parsed.ownerSatisfaction === "object" ? parsed.ownerSatisfaction.value : parsed.ownerSatisfaction;
     }
-    if (parsed.purchaseRisk) {
+    if (parsed.purchaseRisk !== undefined) {
       flatScores.purchaseRisk = typeof parsed.purchaseRisk === "object" ? parsed.purchaseRisk.value : parsed.purchaseRisk;
     }
-    if (parsed.rating) flatScores.rating = parsed.rating;
+    if (parsed.rating !== undefined) flatScores.rating = parsed.rating;
 
     // Store processed data
     await prisma.carSource.update({
@@ -231,7 +256,9 @@ ${source.rawText.slice(0, 5000)}
       },
     });
   } catch (error) {
+    console.error("[sources/process] Unhandled error:", error);
     const errMsg = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: `Processing failed: ${errMsg}` }, { status: 500 });
+    const errStack = error instanceof Error ? error.stack?.split("\n").slice(0, 5).join(" | ") : "";
+    return NextResponse.json({ error: `Processing failed: ${errMsg}`, stack: errStack }, { status: 500 });
   }
 }
