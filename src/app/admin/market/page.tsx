@@ -23,8 +23,8 @@ export default function AdminMarketPage() {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
 
   return (
-    <div className="p-6">
-      <h1 className="text-xl font-black mb-5">مدیریت بازار</h1>
+    <div className="p-5">
+      <h1 className="text-lg font-black mb-4">مدیریت بازار</h1>
 
       {/* Tabs */}
       <div className="flex gap-2 mb-5">

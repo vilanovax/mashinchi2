@@ -67,9 +67,9 @@ export default function AdminTeamPage() {
   if (loading) return <div className="flex items-center justify-center h-full"><div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
-    <div className="p-6 max-w-3xl">
-      <div className="flex items-center justify-between mb-5">
-        <h1 className="text-xl font-black">مدیریت تیم</h1>
+    <div className="p-5 max-w-3xl">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-lg font-black">مدیریت تیم</h1>
         <button onClick={() => setShowAdd(true)} className="px-4 py-1.5 bg-primary text-white text-xs font-bold rounded-lg">
           + عضو جدید
         </button>

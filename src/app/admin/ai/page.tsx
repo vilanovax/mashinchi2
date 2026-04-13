@@ -99,8 +99,8 @@ export default function AdminAIPage() {
   const selectedCarName = cars.find((c) => c.id === selectedCar)?.nameFa || "";
 
   return (
-    <div className="p-6 max-w-3xl">
-      <h1 className="text-xl font-black mb-5">تولید محتوا با AI</h1>
+    <div className="p-5 max-w-3xl">
+      <h1 className="text-lg font-black mb-4">تولید محتوا با AI</h1>
 
       {/* AI Status Bar */}
       <div className={`rounded-xl p-3 mb-5 flex items-center justify-between ${aiReady ? "bg-accent/5 border border-accent/15" : "bg-danger/5 border border-danger/15"}`}>

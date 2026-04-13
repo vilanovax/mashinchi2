@@ -126,9 +126,9 @@ export default function AdminSettingsPage() {
   const hasKey = activeProvider === "openai" ? !!(openaiKey || settings?.hasOpenaiKey) : !!(claudeKey || settings?.hasClaudeKey);
 
   return (
-    <div className="p-6 max-w-3xl">
-      <div className="flex items-center justify-between mb-5">
-        <h1 className="text-xl font-black">تنظیمات</h1>
+    <div className="p-5 max-w-3xl">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-lg font-black">تنظیمات</h1>
         {dirty && (
           <button
             onClick={handleSave}

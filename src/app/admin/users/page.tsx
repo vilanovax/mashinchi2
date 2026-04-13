@@ -59,32 +59,12 @@ export default function AdminUsersPage() {
   if (loading) return <div className="flex items-center justify-center h-full"><div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
-    <div className="p-6 max-w-5xl">
-      <div className="flex items-center justify-between mb-4">
+    <div className="p-5 max-w-5xl">
+      <div className="flex items-center justify-between mb-3">
         <div>
-          <h1 className="text-xl font-black">کاربران</h1>
-          <p className="text-[11px] text-muted mt-0.5">{toPersianDigits(filtered.length)} کاربر نمایش داده شده</p>
+          <h1 className="text-lg font-black">کاربران</h1>
+          <p className="text-[10px] text-muted">{toPersianDigits(filtered.length)} کاربر · {toPersianDigits(stats.active)} فعال · میانگین {toPersianDigits(stats.avgInteractions)} تعامل</p>
         </div>
-      </div>
-
-      {/* Stats Row */}
-      <div className="grid grid-cols-4 gap-3 mb-4">
-        {[
-          { label: "کل کاربران", value: stats.total, icon: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8", color: "text-primary", bg: "bg-primary/8", iconBg: "bg-primary/15" },
-          { label: "فعال", value: stats.active, icon: "M22 11.08V12a10 10 0 11-5.93-9.14", color: "text-accent", bg: "bg-accent/8", iconBg: "bg-accent/15" },
-          { label: "میانگین تعامل", value: stats.avgInteractions, icon: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z", color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-500/8", iconBg: "bg-violet-500/15" },
-          { label: "نشان‌گذاری", value: stats.withFavorites, icon: "M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z", color: "text-danger", bg: "bg-danger/8", iconBg: "bg-danger/15" },
-        ].map((s) => (
-          <div key={s.label} className={`${s.bg} rounded-xl p-3.5 flex items-center gap-3`}>
-            <div className={`w-9 h-9 rounded-lg ${s.iconBg} flex items-center justify-center shrink-0`}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={s.color}><path d={s.icon} /></svg>
-            </div>
-            <div>
-              <div className={`text-xl font-black ${s.color}`}>{toPersianDigits(s.value)}</div>
-              <div className="text-[9px] text-muted">{s.label}</div>
-            </div>
-          </div>
-        ))}
       </div>
 
       {/* Filter Chips */}
