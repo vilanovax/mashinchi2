@@ -127,6 +127,27 @@ export default function AdminSourcesPage() {
   };
   const [mergePreview, setMergePreview] = useState<MergePreview | null>(null);
 
+  // Crawl bar state
+  const [crawlBarUrl, setCrawlBarUrl] = useState("");
+  const [crawlBarLoading, setCrawlBarLoading] = useState(false);
+  const [crawlBarError, setCrawlBarError] = useState<string | null>(null);
+  interface CrawlBarResult {
+    carName: string;
+    matchedCarId: string | null;
+    matchedCarName: string;
+    article: string;
+    specs: { key: string; value: string; category: string }[];
+    comments: { text: string; user: string }[];
+    prices: { label: string; value: number }[];
+    fullText: string;
+    fullTextLength: number;
+    summary: { specsCount: number; commentsCount: number; pricesCount: number; articleLength: number };
+    sourceSite: string;
+    isCarIr: boolean;
+  }
+  const [crawlBarResult, setCrawlBarResult] = useState<CrawlBarResult | null>(null);
+  const [crawlBarSaving, setCrawlBarSaving] = useState(false);
+
   // Add modal
   const [showAdd, setShowAdd] = useState(false);
   const [addMode, setAddMode] = useState<AddMode>("url");
@@ -238,6 +259,121 @@ export default function AdminSourcesPage() {
       showToast("خطا در اتصال");
     }
     setMergeApplying(false);
+  };
+
+  // ── Crawl Bar Handlers ──
+  const handleCrawlBar = async () => {
+    const url = crawlBarUrl.trim();
+    if (!url) return;
+    setCrawlBarLoading(true);
+    setCrawlBarResult(null);
+    setCrawlBarError(null);
+
+    const isCarIr = url.includes("car.ir");
+
+    try {
+      if (isCarIr) {
+        // Use dedicated car.ir endpoint
+        const res = await fetchAdmin("/api/admin/crawlers/car-ir", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setCrawlBarResult({ ...data, sourceSite: "car.ir", isCarIr: true });
+        } else {
+          setCrawlBarError(data.error);
+        }
+      } else {
+        // Use generic crawl endpoint (bama, zoomit, etc.)
+        const res = await fetchAdmin("/api/admin/sources/crawl", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setCrawlBarResult({
+            carName: data.title || "",
+            matchedCarId: data.detectedCarId,
+            matchedCarName: data.detectedCarName || "",
+            article: data.text || "",
+            specs: [],
+            comments: [],
+            prices: [],
+            fullText: data.text || "",
+            fullTextLength: data.textLength || 0,
+            summary: { specsCount: 0, commentsCount: 0, pricesCount: 0, articleLength: data.textLength || 0 },
+            sourceSite: data.sourceSite || "blog",
+            isCarIr: false,
+          });
+        } else {
+          setCrawlBarError(data.error);
+        }
+      }
+    } catch {
+      setCrawlBarError("خطا در اتصال");
+    }
+    setCrawlBarLoading(false);
+  };
+
+  const saveCrawlAsSource = async (type: "full" | "comments") => {
+    if (!crawlBarResult) return;
+    setCrawlBarSaving(true);
+
+    const carId = crawlBarResult.matchedCarId || newCarId;
+    if (!carId) {
+      showToast("ابتدا خودرو را انتخاب کنید");
+      setCrawlBarSaving(false);
+      return;
+    }
+
+    try {
+      if (type === "comments" && crawlBarResult.comments.length > 0) {
+        let saved = 0;
+        for (const c of crawlBarResult.comments) {
+          const res = await fetchAdmin("/api/admin/sources", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              carId,
+              type: "comment",
+              sourceSite: crawlBarResult.sourceSite,
+              url: crawlBarUrl,
+              title: `نظر ${c.user}`,
+              rawText: c.text,
+            }),
+          });
+          if (res.ok) saved++;
+        }
+        showToast(`${toPersianDigits(saved)} کامنت ذخیره شد`);
+      } else {
+        // Save full text
+        const res = await fetchAdmin("/api/admin/sources", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            carId,
+            type: crawlBarResult.isCarIr ? "article" : "article",
+            sourceSite: crawlBarResult.sourceSite,
+            url: crawlBarUrl,
+            title: crawlBarResult.carName || null,
+            rawText: crawlBarResult.fullText,
+          }),
+        });
+        if (res.ok) showToast("متن کامل ذخیره شد");
+      }
+
+      // Refresh sources
+      const updated = await fetchAdmin("/api/admin/sources").then((r) => r.json());
+      setSources(updated);
+      setCrawlBarResult(null);
+      setCrawlBarUrl("");
+    } catch {
+      showToast("خطا در ذخیره");
+    }
+    setCrawlBarSaving(false);
   };
 
   const filtered = useMemo(() => {
@@ -410,15 +546,179 @@ export default function AdminSourcesPage() {
         </button>
       </div>
 
-      {/* Flow indicator */}
-      <div className="flex items-center gap-2 text-[10px] text-muted bg-surface rounded-lg border border-border px-4 py-2.5 mb-4">
-        <span className="bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full font-bold">۱. ثبت</span>
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">۲. پردازش AI</span>
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-        <span className="text-muted">بازبینی</span>
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-        <span className="bg-accent/10 text-accent px-2 py-0.5 rounded-full font-bold">۳. تایید و اعمال</span>
+      {/* ─── Crawl Bar ─── */}
+      <div className="bg-surface rounded-2xl border border-border p-4 mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-600">
+            <path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9" />
+          </svg>
+          <h2 className="text-xs font-black">کرال از وب</h2>
+          <span className="text-[9px] text-muted">car.ir · bama.ir · zoomit.ir · هر URL</span>
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            value={crawlBarUrl}
+            onChange={(e) => { setCrawlBarUrl(e.target.value); setCrawlBarError(null); }}
+            placeholder="https://car.ir/766-mvm-x55-excellent-sport"
+            dir="ltr"
+            className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-xs outline-none font-mono focus:border-emerald-500/50"
+            onKeyDown={(e) => e.key === "Enter" && handleCrawlBar()}
+          />
+          <button
+            onClick={handleCrawlBar}
+            disabled={crawlBarLoading || !crawlBarUrl.trim()}
+            className="px-4 py-2 bg-emerald-600 text-white text-[11px] font-bold rounded-lg disabled:opacity-40 flex items-center gap-1.5 shrink-0"
+          >
+            {crawlBarLoading ? (
+              <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> کرال...</>
+            ) : (
+              <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3" /></svg> کرال</>
+            )}
+          </button>
+        </div>
+
+        {crawlBarError && (
+          <div className="mt-2 bg-red-500/5 border border-red-500/15 rounded-lg px-3 py-2 text-[10px] text-red-500 font-bold flex items-center gap-1.5">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>
+            {crawlBarError}
+          </div>
+        )}
+
+        {/* Crawl Results */}
+        {crawlBarResult && (
+          <div className="mt-3 space-y-2.5">
+            {/* Header + match */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-black">{crawlBarResult.carName || "بدون عنوان"}</span>
+                <span className="text-[8px] bg-foreground/5 text-muted px-1.5 py-0.5 rounded-full">{crawlBarResult.sourceSite}</span>
+                {crawlBarResult.matchedCarId ? (
+                  <span className="text-[9px] bg-emerald-500/15 text-emerald-600 px-2 py-0.5 rounded-full font-bold">
+                    {crawlBarResult.matchedCarName}
+                  </span>
+                ) : (
+                  <select
+                    value={newCarId}
+                    onChange={(e) => setNewCarId(e.target.value)}
+                    className="bg-background border border-amber-500/30 rounded-lg px-2 py-1 text-[10px] outline-none max-w-[180px]"
+                  >
+                    <option value="">انتخاب خودرو...</option>
+                    {cars.map((c) => <option key={c.id} value={c.id}>{c.nameFa}</option>)}
+                  </select>
+                )}
+              </div>
+              <button
+                onClick={() => { setCrawlBarResult(null); setCrawlBarUrl(""); }}
+                className="text-[9px] text-muted hover:text-foreground"
+              >
+                بستن
+              </button>
+            </div>
+
+            {/* Stats */}
+            <div className="flex gap-2">
+              {[
+                ...(crawlBarResult.isCarIr ? [
+                  { label: "توضیحات", value: crawlBarResult.summary.articleLength > 0 ? `${Math.round(crawlBarResult.summary.articleLength / 100)}00` : "—", color: crawlBarResult.summary.articleLength > 0 ? "text-violet-600" : "text-muted" },
+                  { label: "مشخصات", value: String(crawlBarResult.summary.specsCount), color: "text-primary" },
+                  { label: "کامنت", value: String(crawlBarResult.summary.commentsCount), color: "text-amber-600" },
+                ] : []),
+                { label: "حجم متن", value: `${Math.round(crawlBarResult.fullTextLength / 1000)}K`, color: "text-muted" },
+              ].map((s) => (
+                <div key={s.label} className="bg-background rounded-lg px-2.5 py-1.5 text-center min-w-[55px]">
+                  <div className={`text-sm font-black ${s.color}`}>{toPersianDigits(s.value)}</div>
+                  <div className="text-[8px] text-muted">{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Article preview (car.ir) */}
+            {crawlBarResult.article && crawlBarResult.article.length > 0 && (
+              <details open>
+                <summary className="text-[10px] font-black text-muted cursor-pointer">
+                  توضیحات و بررسی ({toPersianDigits(crawlBarResult.article.length)} ک) ▾
+                </summary>
+                <div className="mt-1 bg-background rounded-lg p-2.5 text-[10px] leading-6 max-h-[150px] overflow-y-auto whitespace-pre-line">
+                  {crawlBarResult.article.slice(0, 2000)}
+                </div>
+              </details>
+            )}
+
+            {/* Specs preview (car.ir) */}
+            {crawlBarResult.specs.length > 0 && (
+              <details>
+                <summary className="text-[10px] font-black text-muted cursor-pointer">
+                  مشخصات فنی ({toPersianDigits(crawlBarResult.specs.length)}) ▾
+                </summary>
+                <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 max-h-[150px] overflow-y-auto">
+                  {crawlBarResult.specs.map((s, i) => (
+                    <div key={i} className="flex items-center gap-1 py-0.5 text-[9px]">
+                      <span className="text-muted truncate flex-1">{s.key}:</span>
+                      <span className="font-bold text-foreground truncate max-w-[140px]">{s.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+
+            {/* Comments preview (car.ir) */}
+            {crawlBarResult.comments.length > 0 && (
+              <details>
+                <summary className="text-[10px] font-black text-muted cursor-pointer">
+                  کامنت‌ها ({toPersianDigits(crawlBarResult.comments.length)}) ▾
+                </summary>
+                <div className="mt-1 space-y-1 max-h-[150px] overflow-y-auto">
+                  {crawlBarResult.comments.map((c, i) => (
+                    <div key={i} className="bg-background rounded-lg px-2 py-1.5">
+                      <span className="text-[9px] text-muted">{c.user}: </span>
+                      <span className="text-[10px] leading-5">{c.text.slice(0, 200)}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+
+            {/* Generic crawl preview (non-car.ir) */}
+            {!crawlBarResult.isCarIr && crawlBarResult.fullText && (
+              <details open>
+                <summary className="text-[10px] font-black text-muted cursor-pointer">
+                  متن استخراج‌شده ({toPersianDigits(crawlBarResult.fullTextLength)} ک) ▾
+                </summary>
+                <div className="mt-1 bg-background rounded-lg p-2.5 text-[10px] leading-6 max-h-[150px] overflow-y-auto">
+                  {crawlBarResult.fullText.slice(0, 2000)}
+                </div>
+              </details>
+            )}
+
+            {/* Save actions */}
+            {(crawlBarResult.matchedCarId || newCarId) && (
+              <div className="flex items-center gap-2 pt-2 border-t border-border">
+                <button
+                  onClick={() => saveCrawlAsSource("full")}
+                  disabled={crawlBarSaving}
+                  className="px-3 py-1.5 bg-primary text-white text-[10px] font-bold rounded-lg disabled:opacity-40 flex items-center gap-1"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z M14 2v6h6" /></svg>
+                  ذخیره متن کامل
+                </button>
+                {crawlBarResult.comments.length > 0 && (
+                  <button
+                    onClick={() => saveCrawlAsSource("comments")}
+                    disabled={crawlBarSaving}
+                    className="px-3 py-1.5 bg-amber-600 text-white text-[10px] font-bold rounded-lg disabled:opacity-40 flex items-center gap-1"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
+                    ذخیره {toPersianDigits(crawlBarResult.comments.length)} کامنت
+                  </button>
+                )}
+                <span className="text-[9px] text-muted mr-auto">
+                  در منابع «{crawlBarResult.matchedCarName || cars.find((c) => c.id === newCarId)?.nameFa || ""}» ذخیره می‌شود
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filters */}
