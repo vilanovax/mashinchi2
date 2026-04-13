@@ -432,109 +432,76 @@ export default function CatalogPage() {
                 </div>
               </div>
             ) : (
-              /* ── List Card ── */
+              /* ── List Card (compact) ── */
               <div
                 key={car.id}
                 onClick={() => compareMode ? toggleCompare(car.id) : openCarDetail(car.id)}
-                className={`bg-surface rounded-xl border overflow-hidden active:scale-[0.99] transition-all cursor-pointer shadow-sm ${
+                className={`bg-surface rounded-xl border overflow-hidden active:scale-[0.99] transition-all cursor-pointer ${
                   compareMode && isInCompare(car.id) ? "border-primary ring-2 ring-primary/20" : "border-border"
                 }`}
               >
-                <div className="flex items-stretch relative">
+                <div className="flex items-center gap-2.5 px-3 py-2 relative">
                   {compareMode && (
-                    <div className={`absolute top-2 left-2 z-10 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                    <div className={`absolute top-2 left-2 z-10 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                       isInCompare(car.id) ? "bg-primary border-primary" : "bg-white/80 dark:bg-black/50 border-border"
                     }`}>
                       {isInCompare(car.id) && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><path d="M20 6L9 17l-5-5" /></svg>}
                     </div>
                   )}
 
-                  {/* Satisfaction sidebar */}
-                  <div className={`w-12 shrink-0 flex flex-col items-center justify-center border-e-2 ${
-                    satisfaction && satisfaction >= 7 ? "bg-accent/5 border-e-accent" :
-                    satisfaction && satisfaction >= 5 ? "bg-primary/5 border-e-primary" : "bg-background border-e-transparent"
-                  }`}>
-                    {satisfaction ? (
-                      <>
-                        <span className={`text-base font-black ${
-                          satisfaction >= 7 ? "text-accent" : satisfaction >= 5 ? "text-primary" : "text-muted"
-                        }`}>{toPersianDigits(satisfaction)}</span>
-                        <span className="text-[7px] text-muted">رضایت</span>
-                      </>
-                    ) : (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted/20">
-                        <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-                        <path d="M5 17H3v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2" /><path d="M9 17h6" />
-                      </svg>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 p-2.5 min-w-0">
-                    {/* Name + Fav */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${car.isNew ? "bg-emerald-500" : "bg-orange-400"}`} />
-                        <h3 className="text-[13px] font-black truncate">{car.nameFa}</h3>
-                      </div>
-                      <button onClick={(e) => toggleFavorite(car.id, e)} className="shrink-0 mr-1 p-1 -m-1">
-                        <svg width="15" height="15" viewBox="0 0 24 24"
-                          fill={favoriteIds.has(car.id) ? "currentColor" : "none"}
-                          stroke="currentColor" strokeWidth="2"
-                          className={favoriteIds.has(car.id) ? "text-danger" : "text-muted/30"}
-                        >
-                          <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7z" />
-                        </svg>
-                      </button>
+                  {/* Car info — main area */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${car.isNew ? "bg-emerald-500" : "bg-orange-400"}`} />
+                      <h3 className="text-[13px] font-black truncate">{car.nameFa}</h3>
+                      <span className="text-[9px] text-muted">{car.brandFa}</span>
                     </div>
-
-                    {/* Brand + badges */}
-                    <div className="flex items-center gap-1 mt-0.5 mb-1">
-                      <span className="text-[10px] text-muted">{car.brandFa}</span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
                       <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${originColor}`}>
                         {getOriginLabel(car.origin)}
                       </span>
                       <span className="text-[8px] bg-background text-muted px-1.5 py-0.5 rounded-full">
                         {getCategoryLabel(car.category)}
                       </span>
+                      {car.specs?.horsepower && (
+                        <span className="text-[8px] text-muted flex items-center gap-0.5">
+                          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-muted/40"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
+                          {toPersianDigits(car.specs.horsepower)}
+                        </span>
+                      )}
+                      {car.specs?.transmission && (
+                        <span className="text-[8px] text-muted">{car.specs.transmission === "automatic" ? "AT" : car.specs.transmission === "manual" ? "MT" : ""}</span>
+                      )}
+                      {getTopTraits(car).slice(0, 2).map((trait) => (
+                        <span key={trait} className="text-[7px] font-bold bg-accent/8 text-accent px-1 py-0.5 rounded-full">{trait}</span>
+                      ))}
                     </div>
-
-                    {/* Price + Specs */}
-                    <div className="flex items-center justify-between">
-                      <span className={`text-[11px] font-bold ${hasValidPrice ? "text-primary" : "text-muted"}`}>
-                        {formatPriceRange(car.priceMin, car.priceMax)}
-                      </span>
-                      <div className="flex items-center gap-1.5 text-[9px] text-muted">
-                        {car.specs?.horsepower && (
-                          <span className="flex items-center gap-0.5">
-                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-muted/50"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
-                            {toPersianDigits(car.specs.horsepower)}
-                          </span>
-                        )}
-                        {car.specs?.fuelConsumption && (
-                          <span>{toPersianDigits(car.specs.fuelConsumption)}L</span>
-                        )}
-                        {car.specs?.transmission && (
-                          <span>{car.specs.transmission === "automatic" ? "AT" : car.specs.transmission === "manual" ? "MT" : ""}</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Traits */}
-                    {getTopTraits(car).length > 0 && (
-                      <div className="flex gap-1 mt-1">
-                        {getTopTraits(car).map((trait) => (
-                          <span key={trait} className="text-[8px] font-bold bg-accent/8 text-accent px-1.5 py-0.5 rounded-full">{trait}</span>
-                        ))}
-                        {car.tags
-                          .filter(t => !getTopTraits(car).includes(t) && t !== getCategoryLabel(car.category))
-                          .slice(0, 1)
-                          .map((tag) => (
-                            <span key={tag} className="text-[8px] bg-background text-muted px-1.5 py-0.5 rounded-full">{tag}</span>
-                          ))}
-                      </div>
-                    )}
                   </div>
+
+                  {/* Price + satisfaction — right side */}
+                  <div className="shrink-0 text-left flex flex-col items-end gap-0.5">
+                    <span className={`text-[11px] font-bold ${hasValidPrice ? "text-primary" : "text-muted/40"}`}>
+                      {hasValidPrice ? formatPriceRange(car.priceMin, car.priceMax) : "—"}
+                    </span>
+                    {satisfaction ? (
+                      <span className={`text-[9px] font-black ${
+                        satisfaction >= 7 ? "text-accent" : satisfaction >= 5 ? "text-primary" : "text-muted"
+                      }`}>
+                        رضایت {toPersianDigits(satisfaction)}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {/* Favorite */}
+                  <button onClick={(e) => toggleFavorite(car.id, e)} className="shrink-0 p-0.5">
+                    <svg width="14" height="14" viewBox="0 0 24 24"
+                      fill={favoriteIds.has(car.id) ? "currentColor" : "none"}
+                      stroke="currentColor" strokeWidth="2"
+                      className={favoriteIds.has(car.id) ? "text-danger" : "text-muted/20"}
+                    >
+                      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7z" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             );
