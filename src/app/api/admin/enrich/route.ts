@@ -5,19 +5,39 @@ import { callAI } from "@/lib/ai-provider";
 import { logAction } from "@/lib/auditLog";
 
 // POST - enrich a single car with rich AI-generated data
+// Body: { carId, apply?: boolean }
+// apply=false (default) → preview only, returns generated data + diff
+// apply=true → writes to DB
 export async function POST(request: NextRequest) {
   const session = await verifyAdmin(request);
   if (!session) return unauthorizedResponse();
 
-  const { carId } = await request.json();
+  const body = await request.json();
+  const { carId, apply = false } = body;
   if (!carId) return NextResponse.json({ error: "carId required" }, { status: 400 });
 
   const car = await prisma.car.findUnique({
     where: { id: carId },
-    include: { scores: true, specs: true, tags: true, intel: true },
+    include: { scores: true, specs: true, tags: true, intel: true, reviews: { select: { id: true, source: true } } },
   });
 
   if (!car) return NextResponse.json({ error: "Car not found" }, { status: 404 });
+
+  // Existing data snapshot (for diff)
+  const existing = {
+    description: car.description || "",
+    overallSummary: car.intel?.overallSummary || "",
+    whyBuy: car.intel?.whyBuy || "",
+    whyNotBuy: car.intel?.whyNotBuy || "",
+    ownerVerdict: car.intel?.ownerVerdict || "",
+    frequentPros: car.intel?.frequentPros || [],
+    frequentCons: car.intel?.frequentCons || [],
+    commonIssues: car.intel?.commonIssues || [],
+    purchaseWarnings: car.intel?.purchaseWarnings || [],
+    ownerSatisfaction: car.intel?.ownerSatisfaction ?? 0,
+    purchaseRisk: car.intel?.purchaseRisk ?? 0,
+    reviewCount: car.reviews.length,
+  };
 
   const prompt = `تو یک کارشناس حرفه‌ای خودرو در بازار ایران هستی. لطفا برای خودروی زیر اطلاعات بسیار دقیق و کاربردی تولید کن.
 
@@ -34,87 +54,82 @@ ${car.specs ? `موتور: ${car.specs.engine || "-"} | ${car.specs.horsepower |
 - خیلی دقیق و جزئی باش
 
 {
-  "description": "توصیف ۳-۴ جمله‌ای جذاب و صمیمانه. مثل یک دوست آگاه صحبت کن. بگو این ماشین چیه و برای چه کسی مناسبه.",
-
-  "overallSummary": "جمع‌بندی ۴-۵ جمله‌ای حرفه‌ای. کلیت ماشین، جایگاه در بازار، ارزش خرید، و توصیه نهایی.",
-
-  "whyBuy": "۲-۳ جمله دقیق. دلایل واقعی خرید با توجه به رقبا و شرایط بازار.",
-
-  "whyNotBuy": "۲-۳ جمله صادقانه. مشکلات واقعی و دلایلی که ممکنه پشیمان بشی.",
-
-  "ownerVerdict": "۲-۳ جمله از زبان مالکان واقعی. حس کلی بعد از چند ماه استفاده.",
-
-  "frequentPros": [
-    "نقطه قوت ۱ - با جزئیات (مثلا: صندلی‌های چرمی با تنظیم برقی ۸ جهته، در سفرهای طولانی خسته نمیشی)",
-    "نقطه قوت ۲ - جزئی و ملموس",
-    "نقطه قوت ۳",
-    "نقطه قوت ۴",
-    "نقطه قوت ۵"
-  ],
-
-  "frequentCons": [
-    "نقطه ضعف ۱ - دقیق و واقعی (مثلا: صدای باد از درز درب عقب سمت راننده در سرعت بالای ۱۰۰)",
-    "نقطه ضعف ۲",
-    "نقطه ضعف ۳",
-    "نقطه ضعف ۴"
-  ],
-
-  "commonIssues": [
-    "خرابی رایج ۱ - مشخص و فنی (مثلا: خرابی سنسور اکسیژن بعد از ۵۰ هزار کیلومتر - هزینه تعویض حدود ۳ میلیون تومان)",
-    "خرابی رایج ۲",
-    "خرابی رایج ۳"
-  ],
-
-  "purchaseWarnings": [
-    "هشدار خرید ۱ - عملی و مهم (مثلا: حتما قبل خرید گیربکس رو در سربالایی آزمایش کن)",
-    "هشدار ۲"
-  ],
-
-  "reviewExpert": {
-    "summary": "یک بررسی کارشناسی ۳-۴ جمله‌ای حرفه‌ای از دید یک کارشناس خودرو.",
-    "pros": ["مزیت تخصصی ۱", "مزیت ۲", "مزیت ۳", "مزیت ۴"],
-    "cons": ["عیب تخصصی ۱", "عیب ۲", "عیب ۳"],
-    "warnings": ["هشدار تخصصی"],
-    "rating": 3.5
-  },
-
-  "reviewUser": {
-    "summary": "نظر یک مالک واقعی بعد از ۶ ماه استفاده روزانه. صمیمانه و خودمانی.",
-    "pros": ["از نظر مالک مزیت ۱", "مزیت ۲", "مزیت ۳"],
-    "cons": ["از نظر مالک عیب ۱", "عیب ۲"],
-    "warnings": ["نکته مهمی که بعد خرید فهمیدم"],
-    "rating": 3.2
-  },
-
-  "scores": {
-    "ownerSatisfaction": 7,
-    "purchaseRisk": 4,
-    "acceleration": 6,
-    "depreciation": 5,
-    "repairCost": 6,
-    "secondHandMarket": 5,
-    "buildQuality": 6,
-    "afterSalesService": 5,
-    "fuelEconomy": 7,
-    "suitFamily": 6,
-    "suitCity": 8,
-    "suitTravel": 6,
-    "suitYoung": 7,
-    "suitInvestment": 4
-  }
+  "description": "توصیف ۳-۴ جمله‌ای جذاب و صمیمانه. مثل یک دوست آگاه صحبت کن.",
+  "overallSummary": "جمع‌بندی ۴-۵ جمله‌ای حرفه‌ای.",
+  "whyBuy": "۲-۳ جمله دقیق. دلایل واقعی خرید.",
+  "whyNotBuy": "۲-۳ جمله صادقانه. مشکلات واقعی.",
+  "ownerVerdict": "۲-۳ جمله از زبان مالکان واقعی.",
+  "frequentPros": ["نقطه قوت ۱ با جزئیات", "نقطه قوت ۲", "نقطه قوت ۳", "نقطه قوت ۴", "نقطه قوت ۵"],
+  "frequentCons": ["نقطه ضعف ۱ دقیق و واقعی", "نقطه ضعف ۲", "نقطه ضعف ۳", "نقطه ضعف ۴"],
+  "commonIssues": ["خرابی رایج ۱ فنی با هزینه", "خرابی ۲", "خرابی ۳"],
+  "purchaseWarnings": ["هشدار خرید ۱ عملی", "هشدار ۲"],
+  "reviewExpert": { "summary": "بررسی کارشناسی ۳-۴ جمله", "pros": ["مزیت ۱","مزیت ۲","مزیت ۳"], "cons": ["عیب ۱","عیب ۲"], "rating": 3.5 },
+  "reviewUser": { "summary": "نظر مالک بعد ۶ ماه استفاده", "pros": ["مزیت ۱","مزیت ۲"], "cons": ["عیب ۱"], "rating": 3.2 },
+  "scores": { "ownerSatisfaction": 7, "purchaseRisk": 4 }
 }
 
-فقط JSON خالص بده. فقط فارسی. واقع‌بینانه بر اساس بازار ایران.`;
+فقط JSON خالص بده. فقط فارسی. واقع‌بینانه.`;
 
   try {
     const text = await callAI(prompt, 3000);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      return NextResponse.json({ error: "Failed to parse AI response", raw: text.slice(0, 500) }, { status: 500 });
+      return NextResponse.json({ error: "پاسخ AI قابل پارس نیست", raw: text.slice(0, 500) }, { status: 500 });
     }
 
     const data = JSON.parse(jsonMatch[0]);
 
+    // Build diff
+    const generated: Record<string, { old: string | string[] | number; new: string | string[] | number; changed: boolean }> = {};
+
+    const textFields = ["description", "overallSummary", "whyBuy", "whyNotBuy", "ownerVerdict"] as const;
+    for (const key of textFields) {
+      const oldVal = existing[key] as string;
+      const newVal = (data[key] || "") as string;
+      generated[key] = { old: oldVal, new: newVal, changed: oldVal !== newVal && newVal.length > 0 };
+    }
+
+    const arrayFields = ["frequentPros", "frequentCons", "commonIssues", "purchaseWarnings"] as const;
+    for (const key of arrayFields) {
+      const oldVal = existing[key] as string[];
+      const newVal = (data[key] || []) as string[];
+      generated[key] = { old: oldVal, new: newVal, changed: newVal.length > 0 };
+    }
+
+    // Scores
+    const scoreFields = ["ownerSatisfaction", "purchaseRisk"];
+    for (const key of scoreFields) {
+      const oldVal = existing[key as keyof typeof existing] as number;
+      const newVal = data.scores?.[key] ?? oldVal;
+      generated[key] = { old: oldVal, new: newVal, changed: oldVal !== newVal };
+    }
+
+    // Reviews
+    generated.reviews = {
+      old: existing.reviewCount,
+      new: existing.reviewCount + (data.reviewExpert ? 1 : 0) + (data.reviewUser ? 1 : 0),
+      changed: !!(data.reviewExpert || data.reviewUser),
+    };
+
+    // Count changes
+    const changedFields = Object.values(generated).filter((g) => g.changed).length;
+    const source = "دانش عمومی AI (بدون منابع واقعی)";
+
+    // ─── Preview Only ───
+    if (!apply) {
+      return NextResponse.json({
+        success: true,
+        preview: true,
+        carId,
+        nameFa: car.nameFa,
+        source,
+        changedFields,
+        generated,
+        rawData: data, // full AI output for apply
+      });
+    }
+
+    // ─── Apply ───
     // Update description
     if (data.description) {
       await prisma.car.update({ where: { id: carId }, data: { description: data.description } });
@@ -137,8 +152,8 @@ ${car.specs ? `موتور: ${car.specs.engine || "-"} | ${car.specs.horsepower |
     }
 
     if (Object.keys(intelData).length > 0) {
-      const existing = await prisma.carIntelligence.findUnique({ where: { carId } });
-      if (existing) {
+      const existingIntel = await prisma.carIntelligence.findUnique({ where: { carId } });
+      if (existingIntel) {
         await prisma.carIntelligence.update({ where: { carId }, data: intelData });
       } else {
         await prisma.carIntelligence.create({
@@ -186,17 +201,21 @@ ${car.specs ? `موتور: ${car.specs.engine || "-"} | ${car.specs.horsepower |
       reviewsCreated.push("user");
     }
 
-    await logAction("update", "car", carId, { action: "enrich", nameFa: car.nameFa });
+    await logAction("update", "car", carId, { action: "enrich", nameFa: car.nameFa, changedFields });
 
     return NextResponse.json({
       success: true,
+      applied: true,
       carId,
       nameFa: car.nameFa,
-      updated: { description: !!data.description, intel: Object.keys(intelData).length, reviews: reviewsCreated },
+      source,
+      changedFields,
+      generated,
     });
   } catch (error) {
+    console.error("[enrich] Error:", error);
     const errMsg = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: `Enrichment failed: ${errMsg}` }, { status: 500 });
+    return NextResponse.json({ error: `غنی‌سازی ناموفق: ${errMsg}` }, { status: 500 });
   }
 }
 

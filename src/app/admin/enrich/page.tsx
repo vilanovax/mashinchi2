@@ -10,10 +10,21 @@ interface CarStatus {
   prosCount: number; reviewCount: number; satisfaction: number;
 }
 
-interface EnrichResult {
+interface DiffItem {
+  old: string | string[] | number;
+  new: string | string[] | number;
+  changed: boolean;
+}
+
+interface EnrichPreview {
+  success: boolean;
+  preview: boolean;
   carId: string;
   nameFa: string;
-  updated: { description: boolean; intel: number; reviews: string[] };
+  source: string;
+  changedFields: number;
+  generated: Record<string, DiffItem>;
+  rawData: Record<string, unknown>;
 }
 
 const ORIGIN_COLORS: Record<string, string> = {
@@ -49,7 +60,9 @@ export default function AdminEnrichPage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [toast, setToast] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [lastResult, setLastResult] = useState<EnrichResult | null>(null);
+  const [enrichPreview, setEnrichPreview] = useState<EnrichPreview | null>(null);
+  const [applyingEnrich, setApplyingEnrich] = useState(false);
+  const [justEnrichedIds, setJustEnrichedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchAdmin("/api/admin/enrich").then((r) => r.json()).then((d) => { setCars(d); setLoading(false); }).catch(() => setLoading(false));
@@ -92,21 +105,18 @@ export default function AdminEnrichPage() {
     });
   }, [filtered]);
 
+  // Step 1: Request preview (AI generates but doesn't save)
   const enrichSingle = async (carId: string) => {
-    const car = cars.find((c) => c.id === carId);
     setEnrichingId(carId);
-    setLastResult(null);
+    setEnrichPreview(null);
     try {
       const res = await fetchAdmin("/api/admin/enrich", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ carId }),
+        body: JSON.stringify({ carId, apply: false }),
       });
       const data = await res.json();
-      if (data.success) {
-        setLastResult(data);
-        const updated = await fetchAdmin("/api/admin/enrich").then((r) => r.json());
-        setCars(updated);
-        showToast(`${car?.nameFa} غنی‌سازی شد`);
+      if (data.success && data.preview) {
+        setEnrichPreview(data);
       } else {
         showToast(data.error || "خطا");
       }
@@ -114,6 +124,31 @@ export default function AdminEnrichPage() {
       showToast("خطا در اتصال");
     }
     setEnrichingId(null);
+  };
+
+  // Step 2: Apply after preview
+  const applyEnrich = async () => {
+    if (!enrichPreview) return;
+    setApplyingEnrich(true);
+    try {
+      const res = await fetchAdmin("/api/admin/enrich", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ carId: enrichPreview.carId, apply: true }),
+      });
+      const data = await res.json();
+      if (data.success && data.applied) {
+        showToast(`${enrichPreview.nameFa} غنی‌سازی و ذخیره شد`);
+        setJustEnrichedIds((prev) => new Set(prev).add(enrichPreview.carId));
+        setEnrichPreview(null);
+        const updated = await fetchAdmin("/api/admin/enrich").then((r) => r.json());
+        setCars(updated);
+      } else {
+        showToast(data.error || "خطا در اعمال");
+      }
+    } catch {
+      showToast("خطا در اتصال");
+    }
+    setApplyingEnrich(false);
   };
 
   const enrichBatch = async () => {
@@ -263,7 +298,7 @@ export default function AdminEnrichPage() {
           const needs = needsWork(car);
           const isEnriching = enrichingId === car.id;
           const isExpanded = expandedId === car.id;
-          const justEnriched = lastResult?.carId === car.id;
+          const justEnriched = justEnrichedIds.has(car.id);
 
           const dots = [
             { ok: car.hasDescription, tip: "توصیف" },
@@ -362,12 +397,10 @@ export default function AdminEnrichPage() {
                     </button>
                   )}
 
-                  {justEnriched && lastResult && (
-                    <div className="mt-2 pt-1.5 border-t border-border/50 flex gap-2 text-[9px]">
-                      <span className="text-emerald-600 font-bold">نتیجه:</span>
-                      {lastResult.updated.description && <span className="bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded font-bold">+ توصیف</span>}
-                      {lastResult.updated.intel > 0 && <span className="bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded font-bold">+ {toPersianDigits(lastResult.updated.intel)} فیلد</span>}
-                      {lastResult.updated.reviews.length > 0 && <span className="bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded font-bold">+ {toPersianDigits(lastResult.updated.reviews.length)} نظر</span>}
+                  {justEnriched && (
+                    <div className="mt-2 pt-1.5 border-t border-border/50 text-[9px] text-emerald-600 font-bold flex items-center gap-1">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" /></svg>
+                      غنی‌سازی اعمال شد
                     </div>
                   )}
                 </div>
@@ -376,6 +409,169 @@ export default function AdminEnrichPage() {
           );
         })}
       </div>
+
+      {/* ─── Enrich Preview Modal ─── */}
+      {enrichPreview && (() => {
+        const FIELD_LABELS: Record<string, string> = {
+          description: "توصیف خودرو", overallSummary: "جمع‌بندی کلی", whyBuy: "چرا بخری",
+          whyNotBuy: "چرا نخری", ownerVerdict: "نظر مالکان",
+          frequentPros: "نقاط قوت", frequentCons: "نقاط ضعف",
+          commonIssues: "خرابی‌های رایج", purchaseWarnings: "هشدارهای خرید",
+          ownerSatisfaction: "رضایت مالکان", purchaseRisk: "ریسک خرید", reviews: "نظرات",
+        };
+
+        const entries = Object.entries(enrichPreview.generated);
+        const changedEntries = entries.filter(([, v]) => v.changed);
+
+        return (
+          <>
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" onClick={() => !applyingEnrich && setEnrichPreview(null)} />
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface rounded-2xl z-50 shadow-2xl w-[800px] max-h-[90vh] flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
+                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black">پیش‌نمایش غنی‌سازی — {enrichPreview.nameFa}</h3>
+                    <p className="text-[10px] text-muted flex items-center gap-1.5">
+                      <span>منبع:</span>
+                      <span className="bg-amber-500/10 text-amber-600 px-1.5 py-0.5 rounded-full font-bold text-[8px]">{enrichPreview.source}</span>
+                      <span>·</span>
+                      <span className="font-bold text-foreground">{toPersianDigits(enrichPreview.changedFields)} فیلد تغییر</span>
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setEnrichPreview(null)} disabled={applyingEnrich} className="w-7 h-7 rounded-lg hover:bg-background text-muted hover:text-foreground flex items-center justify-center disabled:opacity-30">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="px-5 py-4 overflow-y-auto flex-1 space-y-3">
+                {/* Source warning */}
+                <div className="bg-amber-500/5 border border-amber-500/15 rounded-xl px-3 py-2 flex items-start gap-2">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-600 shrink-0 mt-0.5">
+                    <path d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 004.99 19z" />
+                  </svg>
+                  <div className="text-[10px] text-muted leading-5">
+                    <span className="font-bold text-amber-600">توجه:</span> این داده‌ها از <span className="font-bold">دانش عمومی AI</span> تولید شدن (نه از منابع واقعی).
+                    برای دقت بیشتر، از صفحه «منابع» متن واقعی اضافه و پردازش کنید.
+                  </div>
+                </div>
+
+                {/* Changed fields */}
+                {changedEntries.map(([key, diff]) => {
+                  const label = FIELD_LABELS[key] || key;
+                  const isArray = Array.isArray(diff.new);
+                  const isNumber = typeof diff.new === "number";
+                  const hasOld = isArray ? (diff.old as string[]).length > 0 : isNumber ? (diff.old as number) > 0 : !!(diff.old as string);
+
+                  return (
+                    <div key={key} className={`rounded-xl border p-3 ${hasOld ? "bg-amber-500/3 border-amber-500/15" : "bg-emerald-500/3 border-emerald-500/15"}`}>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="text-[10px] font-black text-foreground">{label}</span>
+                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${hasOld ? "bg-amber-500/15 text-amber-600" : "bg-emerald-500/15 text-emerald-600"}`}>
+                          {hasOld ? "جایگزین" : "جدید"}
+                        </span>
+                      </div>
+
+                      {/* Text fields */}
+                      {typeof diff.new === "string" && (
+                        <div className="space-y-1.5">
+                          {hasOld && (
+                            <div className="bg-background/50 rounded-lg px-2.5 py-1.5">
+                              <div className="text-[8px] text-muted mb-0.5">قبل</div>
+                              <p className="text-[10px] leading-5 text-muted/70 line-clamp-2">{diff.old as string}</p>
+                            </div>
+                          )}
+                          <div className={`rounded-lg px-2.5 py-1.5 ${hasOld ? "bg-emerald-500/5" : ""}`}>
+                            {hasOld && <div className="text-[8px] text-emerald-600 font-bold mb-0.5">بعد</div>}
+                            <p className="text-[10px] leading-5 text-foreground">{diff.new as string}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Array fields */}
+                      {isArray && (
+                        <div className="space-y-1">
+                          {(diff.old as string[]).length > 0 && (
+                            <div className="bg-background/50 rounded-lg px-2.5 py-1.5">
+                              <div className="text-[8px] text-muted mb-0.5">قبل ({toPersianDigits((diff.old as string[]).length)})</div>
+                              <div className="flex flex-wrap gap-1">
+                                {(diff.old as string[]).map((item, i) => (
+                                  <span key={i} className="text-[9px] text-muted/70 bg-muted/10 px-1.5 py-0.5 rounded line-clamp-1">{item}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <div className={`rounded-lg px-2.5 py-1.5 ${hasOld ? "bg-emerald-500/5" : ""}`}>
+                            {hasOld && <div className="text-[8px] text-emerald-600 font-bold mb-0.5">بعد ({toPersianDigits((diff.new as string[]).length)})</div>}
+                            <div className="space-y-0.5">
+                              {(diff.new as string[]).map((item, i) => (
+                                <div key={i} className="flex items-start gap-1 text-[10px] leading-5">
+                                  <span className="text-emerald-600 font-bold shrink-0">+</span>
+                                  <span className="text-foreground">{item}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Number fields */}
+                      {isNumber && (
+                        <div className="flex items-center gap-2 text-[11px]">
+                          {hasOld && (
+                            <>
+                              <span className="text-muted">{toPersianDigits(diff.old as number)}</span>
+                              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-muted/50"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+                            </>
+                          )}
+                          <span className="font-black text-foreground">{toPersianDigits(diff.new as number)}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center gap-2 px-5 py-3 border-t border-border bg-background/30">
+                <button
+                  onClick={() => setEnrichPreview(null)}
+                  disabled={applyingEnrich}
+                  className="px-4 py-2 text-[11px] font-bold text-muted hover:text-foreground disabled:opacity-30"
+                >
+                  انصراف
+                </button>
+                <div className="mr-auto flex items-center gap-2">
+                  <span className="text-[9px] text-amber-600 flex items-center gap-1">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 004.99 19z" />
+                    </svg>
+                    از دانش AI — نه منابع واقعی
+                  </span>
+                  <button
+                    onClick={applyEnrich}
+                    disabled={applyingEnrich}
+                    className="px-4 py-2 bg-primary text-white text-[11px] font-bold rounded-xl disabled:opacity-40 flex items-center gap-1.5 shadow-sm shadow-primary/20"
+                  >
+                    {applyingEnrich ? (
+                      <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> در حال ذخیره...</>
+                    ) : (
+                      <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" /></svg> تایید و اعمال</>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-foreground text-background text-xs font-bold px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
     </div>

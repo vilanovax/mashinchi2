@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, createContext, useContext } from "react";
+import { useState, useEffect, useRef, useCallback, createContext, useContext } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { toPersianDigits } from "@/lib/utils";
 
 interface AdminContextType {
   token: string;
@@ -70,6 +71,229 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+// ─── Search Modal (Cmd+K) ───
+interface SearchResult {
+  cars: { id: string; nameFa: string; nameEn: string; brandFa: string; origin: string; imageUrl: string | null; sourcesCount: number; reviewsCount: number }[];
+  sources: { id: string; title: string; type: string; sourceSite: string; status: string; carId: string; carName: string }[];
+  pages: { path: string; label: string }[];
+}
+
+const ORIGIN_LABELS_SEARCH: Record<string, string> = {
+  iranian: "ایرانی", chinese: "چینی", korean: "کره‌ای", japanese: "ژاپنی", european: "اروپایی",
+};
+
+const TYPE_LABELS_SEARCH: Record<string, string> = {
+  comment: "تجربه", article: "مقاله", review: "ریویو", video: "ویدیو",
+  comparison: "مقایسه", forum: "فروم", expert: "کارشناس", manual: "دستی",
+};
+
+function SearchModal({ fetchAdmin, onClose }: { fetchAdmin: (url: string) => Promise<Response>; onClose: () => void }) {
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  // Debounced search
+  const search = useCallback((q: string) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (!q.trim()) { setResults(null); setLoading(false); return; }
+    setLoading(true);
+    timerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetchAdmin(`/api/admin/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        setResults(data);
+        setSelectedIdx(0);
+      } catch { /* ignore */ }
+      setLoading(false);
+    }, 200);
+  }, [fetchAdmin]);
+
+  useEffect(() => { search(query); }, [query, search]);
+
+  // Build flat list of all results for keyboard nav
+  const flatItems: { type: "car" | "source" | "page"; id: string; label: string; sub: string; path: string }[] = [];
+
+  if (results) {
+    for (const p of results.pages) {
+      flatItems.push({ type: "page", id: p.path, label: p.label, sub: "صفحه", path: p.path });
+    }
+    for (const c of results.cars) {
+      flatItems.push({ type: "car", id: c.id, label: c.nameFa, sub: `${c.brandFa} · ${ORIGIN_LABELS_SEARCH[c.origin] || c.origin}`, path: `/admin/cars/${c.id}` });
+    }
+    for (const s of results.sources) {
+      flatItems.push({ type: "source", id: s.id, label: s.title, sub: `${s.carName} · ${TYPE_LABELS_SEARCH[s.type] || s.type}`, path: `/admin/cars/${s.carId}/data` });
+    }
+  }
+
+  const navigate = (path: string) => {
+    router.push(path);
+    onClose();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setSelectedIdx((i) => Math.min(i + 1, flatItems.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setSelectedIdx((i) => Math.max(i - 1, 0)); }
+    else if (e.key === "Enter" && flatItems[selectedIdx]) { navigate(flatItems[selectedIdx].path); }
+    else if (e.key === "Escape") { onClose(); }
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" onClick={onClose} />
+      <div className="fixed top-[15%] left-1/2 -translate-x-1/2 bg-surface rounded-2xl z-50 shadow-2xl w-[560px] max-h-[70vh] flex flex-col overflow-hidden border border-border" dir="rtl">
+        {/* Search input */}
+        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={loading ? "text-primary animate-pulse" : "text-muted"}>
+            <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="جستجوی خودرو، منبع، صفحه..."
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted/50"
+          />
+          <kbd className="text-[9px] text-muted bg-background px-1.5 py-0.5 rounded border border-border font-mono">ESC</kbd>
+        </div>
+
+        {/* Results */}
+        <div className="overflow-y-auto flex-1">
+          {!query && (
+            <div className="px-4 py-6 text-center">
+              <p className="text-[11px] text-muted">نام خودرو، برند، یا صفحه مورد نظر رو بنویس</p>
+              <div className="flex items-center justify-center gap-2 mt-2 text-[9px] text-muted/60">
+                <span><kbd className="bg-background px-1 py-0.5 rounded border border-border font-mono">↑↓</kbd> حرکت</span>
+                <span><kbd className="bg-background px-1 py-0.5 rounded border border-border font-mono">Enter</kbd> انتخاب</span>
+              </div>
+            </div>
+          )}
+
+          {query && flatItems.length === 0 && !loading && (
+            <div className="px-4 py-6 text-center">
+              <p className="text-[11px] text-muted">نتیجه‌ای پیدا نشد</p>
+            </div>
+          )}
+
+          {flatItems.length > 0 && (
+            <div className="py-1">
+              {/* Pages */}
+              {results!.pages.length > 0 && (
+                <>
+                  <div className="px-4 py-1 text-[9px] text-muted/60 font-bold">صفحات</div>
+                  {results!.pages.map((p) => {
+                    const idx = flatItems.findIndex((f) => f.id === p.path);
+                    return (
+                      <button
+                        key={p.path}
+                        onClick={() => navigate(p.path)}
+                        onMouseEnter={() => setSelectedIdx(idx)}
+                        className={`w-full flex items-center gap-2.5 px-4 py-2 text-right transition-colors ${
+                          selectedIdx === idx ? "bg-primary/10" : "hover:bg-background/50"
+                        }`}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted shrink-0">
+                          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                        </svg>
+                        <span className="text-[11px] font-bold">{p.label}</span>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* Cars */}
+              {results!.cars.length > 0 && (
+                <>
+                  <div className="px-4 py-1 text-[9px] text-muted/60 font-bold mt-1">خودروها</div>
+                  {results!.cars.map((c) => {
+                    const idx = flatItems.findIndex((f) => f.id === c.id && f.type === "car");
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => navigate(`/admin/cars/${c.id}`)}
+                        onMouseEnter={() => setSelectedIdx(idx)}
+                        className={`w-full flex items-center gap-2.5 px-4 py-2 text-right transition-colors ${
+                          selectedIdx === idx ? "bg-primary/10" : "hover:bg-background/50"
+                        }`}
+                      >
+                        {c.imageUrl ? (
+                          <img src={c.imageUrl} alt="" className="w-8 h-6 object-cover rounded border border-border shrink-0" />
+                        ) : (
+                          <div className="w-8 h-6 bg-background rounded border border-border shrink-0 flex items-center justify-center">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted/40">
+                              <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0" />
+                            </svg>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-bold">{c.nameFa}</span>
+                            <span className="text-[9px] text-muted">{c.brandFa}</span>
+                          </div>
+                          <div className="text-[9px] text-muted/70">
+                            {ORIGIN_LABELS_SEARCH[c.origin] || c.origin}
+                            {c.sourcesCount > 0 && <> · {toPersianDigits(c.sourcesCount)} منبع</>}
+                            {c.reviewsCount > 0 && <> · {toPersianDigits(c.reviewsCount)} نظر</>}
+                          </div>
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); navigate(`/admin/cars/${c.id}/data`); }}
+                            className="text-[8px] text-primary bg-primary/8 px-1.5 py-0.5 rounded font-bold hover:bg-primary/15"
+                          >
+                            دیتا
+                          </button>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* Sources */}
+              {results!.sources.length > 0 && (
+                <>
+                  <div className="px-4 py-1 text-[9px] text-muted/60 font-bold mt-1">منابع</div>
+                  {results!.sources.map((s) => {
+                    const idx = flatItems.findIndex((f) => f.id === s.id && f.type === "source");
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => navigate(`/admin/cars/${s.carId}/data`)}
+                        onMouseEnter={() => setSelectedIdx(idx)}
+                        className={`w-full flex items-center gap-2.5 px-4 py-2 text-right transition-colors ${
+                          selectedIdx === idx ? "bg-primary/10" : "hover:bg-background/50"
+                        }`}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted shrink-0">
+                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z M14 2v6h6" />
+                        </svg>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[11px] font-bold truncate block">{s.title}</span>
+                          <span className="text-[9px] text-muted">{s.carName} · {TYPE_LABELS_SEARCH[s.type] || s.type} · {s.sourceSite}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 function SidebarFooter({ adminName, adminRole, roleLabels, onLogout }: {
   adminName: string; adminRole: string; roleLabels: Record<string, string>; onLogout: () => void;
 }) {
@@ -108,8 +332,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showSearch, setShowSearch] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+
+  // Cmd+K / Ctrl+K shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setShowSearch(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   useEffect(() => {
     const stored = localStorage.getItem("mashinchi-admin-token");
@@ -269,7 +506,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <main className="flex-1 overflow-y-auto">
           {/* Top bar with notification bell */}
           <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border/50 px-6 py-2 flex items-center justify-between">
-            <div />
+            {/* Search trigger */}
+            <button
+              onClick={() => setShowSearch(true)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-surface border border-border rounded-lg text-[11px] text-muted hover:text-foreground hover:border-primary/30 transition-colors"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+              </svg>
+              جستجو...
+              <kbd className="text-[8px] bg-background px-1 py-0.5 rounded border border-border font-mono mr-2">⌘K</kbd>
+            </button>
             <div className="flex items-center gap-3">
               {/* Export button */}
               <div className="relative group">
@@ -309,6 +556,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           </div>
           {children}
+
+          {/* Search Modal */}
+          {showSearch && (
+            <SearchModal fetchAdmin={fetchAdmin} onClose={() => setShowSearch(false)} />
+          )}
         </main>
       </div>
     </AdminContext.Provider>
