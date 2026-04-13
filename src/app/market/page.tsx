@@ -1,7 +1,18 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { formatPrice, toPersianDigits, getOriginLabel, getCategoryLabel } from "@/lib/utils";
+import { toPersianDigits, getOriginLabel, getCategoryLabel } from "@/lib/utils";
+
+function formatBillion(n: number | string): string {
+  const num = typeof n === "string" ? parseInt(n) : n;
+  if (!num || num <= 0) return "—";
+  if (num >= 1_000_000_000) {
+    const b = num / 1_000_000_000;
+    return toPersianDigits(b.toFixed(1).replace(/\.0$/, "")) + " میلیارد";
+  }
+  if (num >= 1_000_000) return toPersianDigits(Math.round(num / 1_000_000).toString()) + " م";
+  return toPersianDigits(num.toString());
+}
 
 // ── Types ──
 interface CarPrice {
@@ -219,7 +230,7 @@ function PriceTable() {
               {/* Price + Change */}
               <div className="text-left flex-shrink-0">
                 <div className="text-sm font-black text-foreground">
-                  {toPersianDigits(formatPrice(car.priceMin))} ~ {toPersianDigits(formatPrice(car.priceMax))}
+                  {formatBillion(car.priceMin)}{car.priceMin !== car.priceMax && parseInt(car.priceMax) > 0 ? ` ~ ${formatBillion(car.priceMax)}` : ""}
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   {car.weekChange !== null && car.weekChange !== 0 && (
@@ -400,7 +411,7 @@ function PriceChart({ trends }: { trends: TrendCar[] }) {
             <g key={frac}>
               <line x1={PAD} y1={y} x2={W - 10} y2={y} stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="3,3" />
               <text x={PAD - 2} y={y + 3} textAnchor="end" fill="var(--muted)" fontSize="7" fontFamily="Vazirmatn">
-                {formatPrice(val)}
+                {formatBillion(val)}
               </text>
             </g>
           );
@@ -591,13 +602,13 @@ function InsightsView() {
             <StatCard
               label="ارزان‌ترین"
               value={data.quickStats.cheapest[0]?.nameFa || "-"}
-              sub={data.quickStats.cheapest[0] ? toPersianDigits(formatPrice(data.quickStats.cheapest[0].price)) : ""}
+              sub={data.quickStats.cheapest[0] ? formatBillion(data.quickStats.cheapest[0].price) : ""}
               color="accent"
             />
             <StatCard
               label="گران‌ترین"
               value={data.quickStats.expensive[0]?.nameFa || "-"}
-              sub={data.quickStats.expensive[0] ? toPersianDigits(formatPrice(data.quickStats.expensive[0].price)) : ""}
+              sub={data.quickStats.expensive[0] ? formatBillion(data.quickStats.expensive[0].price) : ""}
               color="danger"
             />
           </div>

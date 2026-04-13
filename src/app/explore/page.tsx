@@ -566,8 +566,8 @@ function ExploreContent() {
                   <div className="text-[10px] text-muted mt-0.5">امنیت خرید</div>
                 </div>
                 {carDetail.reviews.length > 0 && (
-                  <div className="flex-1 bg-yellow-500/8 rounded-xl p-3 text-center">
-                    <div className="text-lg font-black text-yellow-600 dark:text-yellow-400">
+                  <div className="flex-1 bg-amber-500/8 rounded-xl p-3 text-center">
+                    <div className="text-lg font-black text-amber-600 dark:text-amber-400">
                       {toPersianDigits((carDetail.reviews.reduce((s, r) => s + (r.rating || 3), 0) / carDetail.reviews.length).toFixed(1))}
                       <span className="text-xs font-normal text-muted">/۵</span>
                     </div>
@@ -653,7 +653,7 @@ function ExploreContent() {
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
                               key === "maintenanceRisk"
-                                ? score >= 7 ? "bg-danger" : score >= 4 ? "bg-yellow-500" : "bg-accent"
+                                ? score >= 7 ? "bg-danger" : score >= 4 ? "bg-orange-500" : "bg-accent"
                                 : score >= 7 ? "bg-accent" : score >= 4 ? "bg-primary" : "bg-danger"
                             }`}
                             style={{ width: `${(score / 10) * 100}%` }}
@@ -669,19 +669,22 @@ function ExploreContent() {
 
             {/* Warnings Section - merged issues + warnings */}
             {carDetail.intel && (carDetail.intel.commonIssues.length > 0 || carDetail.intel.purchaseWarnings.length > 0) && (
-              <div className="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800/30 rounded-xl p-4">
-                <h4 className="text-xs font-black text-yellow-700 dark:text-yellow-400 mb-2">هشدارها و خرابی‌های رایج</h4>
+              <div className="bg-red-500/5 border border-red-500/15 rounded-xl p-4">
+                <h4 className="text-xs font-black text-red-600 dark:text-red-400 mb-2 flex items-center gap-1.5">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 004.99 19z" /></svg>
+                  هشدارها و خرابی‌ها
+                </h4>
                 <div className="space-y-1.5">
                   {carDetail.intel.purchaseWarnings.map((w, i) => (
-                    <div key={`w-${i}`} className="flex items-start gap-1.5 text-[11px] text-danger">
-                      <span className="shrink-0 mt-px font-bold">!</span>
-                      <span>{w}</span>
+                    <div key={`w-${i}`} className="flex items-start gap-1.5 text-[11px] text-red-600 dark:text-red-400">
+                      <span className="shrink-0 mt-0.5 font-black">!</span>
+                      <span className="leading-5">{w}</span>
                     </div>
                   ))}
                   {carDetail.intel.commonIssues.map((issue, i) => (
-                    <div key={`i-${i}`} className="flex items-start gap-1.5 text-[11px] text-yellow-700 dark:text-yellow-400">
-                      <span className="shrink-0 mt-px font-bold">!</span>
-                      <span>{issue}</span>
+                    <div key={`i-${i}`} className="flex items-start gap-1.5 text-[11px] text-orange-600 dark:text-orange-400">
+                      <span className="shrink-0 mt-0.5 font-black">!</span>
+                      <span className="leading-5">{issue}</span>
                     </div>
                   ))}
                 </div>

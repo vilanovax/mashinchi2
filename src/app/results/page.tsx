@@ -2,8 +2,19 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { formatPrice, toPersianDigits, getOriginLabel, getCategoryLabel } from "@/lib/utils";
+import { toPersianDigits, getOriginLabel, getCategoryLabel } from "@/lib/utils";
 import BottomSheet from "@/components/BottomSheet";
+
+function formatBillion(n: number | string): string {
+  const num = typeof n === "string" ? parseInt(n) : n;
+  if (!num || num <= 0) return "—";
+  if (num >= 1_000_000_000) {
+    const b = num / 1_000_000_000;
+    return toPersianDigits(b.toFixed(1).replace(/\.0$/, "")) + " میلیارد";
+  }
+  if (num >= 1_000_000) return toPersianDigits(Math.round(num / 1_000_000).toString()) + " م";
+  return toPersianDigits(num.toString());
+}
 
 interface Review {
   source: string;
@@ -283,13 +294,14 @@ export default function ResultsPage() {
                 {/* Price */}
                 <div className="mr-11 mb-3">
                   <span className="text-sm font-bold text-primary">
-                    {toPersianDigits(formatPrice(car.priceMin))}
+                    {formatBillion(car.priceMin)}
                   </span>
-                  <span className="text-xs text-muted"> تا </span>
-                  <span className="text-sm font-bold text-primary">
-                    {toPersianDigits(formatPrice(car.priceMax))}
-                  </span>
-                  <span className="text-xs text-muted"> تومان</span>
+                  {car.priceMin !== car.priceMax && parseInt(car.priceMax) > 0 && (
+                    <>
+                      <span className="text-xs text-muted"> تا </span>
+                      <span className="text-sm font-bold text-primary">{formatBillion(car.priceMax)}</span>
+                    </>
+                  )}
                 </div>
 
                 {/* Match Reasons */}
@@ -370,7 +382,7 @@ export default function ResultsPage() {
                   </div>
                   <div className="text-left">
                     <span className="text-xs font-bold text-primary block">
-                      {toPersianDigits(formatPrice(alt.priceMin))}
+                      {formatBillion(alt.priceMin)}
                     </span>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted mt-1">
                       <path d="M9 18l6-6-6-6" />
@@ -412,9 +424,9 @@ export default function ResultsPage() {
               <div>
                 <p className="text-xs text-muted">{selectedCar.brandFa} | {getOriginLabel(selectedCar.origin)} | {getCategoryLabel(selectedCar.category)}</p>
                 <div className="mt-1">
-                  <span className="text-sm font-bold text-primary">{toPersianDigits(formatPrice(selectedCar.priceMin))}</span>
+                  <span className="text-sm font-bold text-primary">{formatBillion(selectedCar.priceMin)}</span>
                   <span className="text-xs text-muted"> تا </span>
-                  <span className="text-sm font-bold text-primary">{toPersianDigits(formatPrice(selectedCar.priceMax))}</span>
+                  <span className="text-sm font-bold text-primary">{formatBillion(selectedCar.priceMax)}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -450,8 +462,8 @@ export default function ResultsPage() {
                   <div className="text-[10px] text-muted mt-0.5">امنیت خرید</div>
                 </div>
                 {selectedCar.reviews.length > 0 && (
-                  <div className="flex-1 bg-yellow-500/8 rounded-xl p-3 text-center">
-                    <div className="text-lg font-black text-yellow-600 dark:text-yellow-400">
+                  <div className="flex-1 bg-amber-500/8 rounded-xl p-3 text-center">
+                    <div className="text-lg font-black text-amber-600 dark:text-amber-400">
                       {toPersianDigits((selectedCar.reviews.reduce((s, r) => s + (r.rating || 3), 0) / selectedCar.reviews.length).toFixed(1))}
                       <span className="text-xs font-normal text-muted">/۵</span>
                     </div>
@@ -567,7 +579,7 @@ export default function ResultsPage() {
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
                               key === "maintenanceRisk"
-                                ? score >= 7 ? "bg-danger" : score >= 4 ? "bg-yellow-500" : "bg-accent"
+                                ? score >= 7 ? "bg-danger" : score >= 4 ? "bg-orange-500" : "bg-accent"
                                 : score >= 7 ? "bg-accent" : score >= 4 ? "bg-primary" : "bg-danger"
                             }`}
                             style={{ width: `${(score / 10) * 100}%` }}
@@ -583,19 +595,22 @@ export default function ResultsPage() {
 
             {/* Warnings Section - merged */}
             {selectedCar.intel && (selectedCar.intel.commonIssues.length > 0 || selectedCar.intel.purchaseWarnings.length > 0) && (
-              <div className="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800/30 rounded-xl p-4">
-                <h4 className="text-xs font-black text-yellow-700 dark:text-yellow-400 mb-2">هشدارها و خرابی‌های رایج</h4>
+              <div className="bg-red-500/5 border border-red-500/15 rounded-xl p-4">
+                <h4 className="text-xs font-black text-red-600 dark:text-red-400 mb-2 flex items-center gap-1.5">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 004.99 19z" /></svg>
+                  هشدارها و خرابی‌ها
+                </h4>
                 <div className="space-y-1.5">
                   {selectedCar.intel.purchaseWarnings.map((w, i) => (
-                    <div key={`w-${i}`} className="flex items-start gap-1.5 text-[11px] text-danger">
-                      <span className="shrink-0 mt-px font-bold">!</span>
-                      <span>{w}</span>
+                    <div key={`w-${i}`} className="flex items-start gap-1.5 text-[11px] text-red-600 dark:text-red-400">
+                      <span className="shrink-0 mt-0.5 font-black">!</span>
+                      <span className="leading-5">{w}</span>
                     </div>
                   ))}
                   {selectedCar.intel.commonIssues.map((issue, i) => (
-                    <div key={`i-${i}`} className="flex items-start gap-1.5 text-[11px] text-yellow-700 dark:text-yellow-400">
-                      <span className="shrink-0 mt-px font-bold">!</span>
-                      <span>{issue}</span>
+                    <div key={`i-${i}`} className="flex items-start gap-1.5 text-[11px] text-orange-600 dark:text-orange-400">
+                      <span className="shrink-0 mt-0.5 font-black">!</span>
+                      <span className="leading-5">{issue}</span>
                     </div>
                   ))}
                 </div>
@@ -651,7 +666,7 @@ export default function ResultsPage() {
                     >
                       <div className="text-xs font-bold">{sc.nameFa}</div>
                       <div className="text-[10px] text-muted">{sc.brandFa}</div>
-                      <div className="text-[11px] text-primary font-bold mt-1">{toPersianDigits(formatPrice(sc.priceMin))}</div>
+                      <div className="text-[11px] text-primary font-bold mt-1">{formatBillion(sc.priceMin)}</div>
                     </button>
                   ))}
                   {selectedCar.alternatives?.map((alt) => (
@@ -662,7 +677,7 @@ export default function ResultsPage() {
                     >
                       <div className="text-xs font-bold">{alt.nameFa}</div>
                       <div className="text-[10px] text-muted">{alt.brandFa}</div>
-                      <div className="text-[11px] text-accent font-bold mt-1">{toPersianDigits(formatPrice(alt.priceMin))}</div>
+                      <div className="text-[11px] text-accent font-bold mt-1">{formatBillion(alt.priceMin)}</div>
                     </button>
                   ))}
                 </div>

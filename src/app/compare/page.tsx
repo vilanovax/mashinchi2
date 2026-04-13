@@ -2,7 +2,18 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { formatPrice, toPersianDigits, getOriginLabel, getCategoryLabel } from "@/lib/utils";
+import { toPersianDigits, getOriginLabel, getCategoryLabel } from "@/lib/utils";
+
+function formatBillion(n: number | string): string {
+  const num = typeof n === "string" ? parseInt(n) : n;
+  if (!num || num <= 0) return "—";
+  if (num >= 1_000_000_000) {
+    const b = num / 1_000_000_000;
+    return toPersianDigits(b.toFixed(1).replace(/\.0$/, "")) + " میلیارد";
+  }
+  if (num >= 1_000_000) return toPersianDigits(Math.round(num / 1_000_000).toString()) + " م";
+  return toPersianDigits(num.toString());
+}
 
 interface CarDetail {
   id: string;
@@ -194,8 +205,10 @@ function CompareContent() {
                   }`}>{getOriginLabel(car.origin)}</span>
                   <span className="text-[8px] bg-background text-muted px-1.5 py-0.5 rounded-full">{getCategoryLabel(car.category)}</span>
                 </div>
-                <div className="text-xs font-bold text-primary mt-2">{toPersianDigits(formatPrice(car.priceMin))}</div>
-                <div className="text-[9px] text-muted">تا {toPersianDigits(formatPrice(car.priceMax))}</div>
+                <div className="text-xs font-bold text-primary mt-2">{formatBillion(car.priceMin)}</div>
+                {car.priceMin !== car.priceMax && parseInt(car.priceMax) > 0 && (
+                  <div className="text-[9px] text-muted">تا {formatBillion(car.priceMax)}</div>
+                )}
                 <div className="text-[9px] text-muted mt-1">
                   برتر در <span className="font-bold text-foreground">{toPersianDigits(wins)}</span> معیار
                 </div>
@@ -287,7 +300,7 @@ function CompareContent() {
             { label: "قدرت", a: carA.specs?.horsepower ? `${carA.specs.horsepower}` : null, b: carB.specs?.horsepower ? `${carB.specs.horsepower}` : null, unit: " اسب", win: specWinner(carA.specs?.horsepower, carB.specs?.horsepower) },
             { label: "گیربکس", a: carA.specs?.transmission === "automatic" ? "اتوماتیک" : carA.specs?.transmission === "manual" ? "دنده‌ای" : carA.specs?.transmission, b: carB.specs?.transmission === "automatic" ? "اتوماتیک" : carB.specs?.transmission === "manual" ? "دنده‌ای" : carB.specs?.transmission, win: null },
             { label: "مصرف", a: carA.specs?.fuelConsumption ? `${carA.specs.fuelConsumption}` : null, b: carB.specs?.fuelConsumption ? `${carB.specs.fuelConsumption}` : null, unit: " لیتر", win: specWinner(carA.specs?.fuelConsumption, carB.specs?.fuelConsumption, true) },
-            { label: "قیمت شروع", a: formatPrice(carA.priceMin), b: formatPrice(carB.priceMin), win: priceA < priceB ? "a" : priceB < priceA ? "b" : null, isPrice: true },
+            { label: "قیمت شروع", a: formatBillion(carA.priceMin), b: formatBillion(carB.priceMin), win: priceA < priceB ? "a" : priceB < priceA ? "b" : null, isPrice: true },
           ];
           return (
             <div className="bg-surface rounded-2xl border border-border overflow-hidden mb-3">
@@ -394,7 +407,7 @@ function CompareContent() {
           )}
           {priceA !== priceB && (
             <div className="mt-2 pt-2 border-t border-border/30 text-[11px] text-primary font-bold">
-              {priceA < priceB ? carA.nameFa : carB.nameFa} حدود {toPersianDigits(formatPrice(Math.abs(priceA - priceB)))} ارزان‌تر
+              {priceA < priceB ? carA.nameFa : carB.nameFa} حدود {formatBillion(Math.abs(priceA - priceB))} ارزان‌تر
             </div>
           )}
         </div>
