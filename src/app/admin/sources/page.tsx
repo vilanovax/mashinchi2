@@ -22,6 +22,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   processed: { label: "پردازش‌شده", color: "text-primary", bg: "bg-primary/10" },
   approved: { label: "تایید‌شده", color: "text-accent", bg: "bg-accent/10" },
   rejected: { label: "رد‌شده", color: "text-danger", bg: "bg-danger/10" },
+  archived: { label: "آرشیو", color: "text-muted", bg: "bg-muted/10" },
 };
 
 const SITE_CONFIG: Record<string, { label: string; color: string }> = {
@@ -241,15 +242,18 @@ export default function AdminSourcesPage() {
 
   const filtered = useMemo(() => {
     return sources.filter((s) => {
-      return (filterCar === "all" || s.carId === filterCar) && (filterStatus === "all" || s.status === filterStatus);
+      if (filterCar !== "all" && s.carId !== filterCar) return false;
+      if (filterStatus === "all") return s.status !== "archived"; // exclude archived from "all"
+      return s.status === filterStatus;
     });
   }, [sources, filterCar, filterStatus]);
 
   const stats = useMemo(() => ({
-    total: sources.length,
+    total: sources.filter((s) => s.status !== "archived").length,
     pending: sources.filter((s) => s.status === "pending").length,
     processed: sources.filter((s) => s.status === "processed").length,
     approved: sources.filter((s) => s.status === "approved").length,
+    archived: sources.filter((s) => s.status === "archived").length,
   }), [sources]);
 
   // Crawl URL
@@ -355,6 +359,41 @@ export default function AdminSourcesPage() {
     setSources((prev) => prev.map((s) => s.id === id ? { ...s, status: "rejected" } : s));
   };
 
+  const handleArchive = async (id: string) => {
+    await fetchAdmin(`/api/admin/sources/${id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "archived" }),
+    });
+    setSources((prev) => prev.map((s) => s.id === id ? { ...s, status: "archived" } : s));
+    // Remove from selection if it was selected
+    setSelectedIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    showToast("به آرشیو منتقل شد");
+  };
+
+  const handleUnarchive = async (id: string) => {
+    // Restore to 'processed' if it had AI data, else 'pending'
+    const src = sources.find((s) => s.id === id);
+    const target = src?.processedSummary ? "processed" : "pending";
+    await fetchAdmin(`/api/admin/sources/${id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: target }),
+    });
+    setSources((prev) => prev.map((s) => s.id === id ? { ...s, status: target } : s));
+    showToast("بازگردانی شد");
+  };
+
+  const handleHardDelete = async (id: string) => {
+    if (!confirm("حذف کامل و برگشت‌ناپذیر این منبع؟")) return;
+    await fetchAdmin(`/api/admin/sources/${id}`, { method: "DELETE" });
+    setSources((prev) => prev.filter((s) => s.id !== id));
+    showToast("منبع برای همیشه حذف شد");
+  };
+
   if (loading) return <div className="flex items-center justify-center h-full"><div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
@@ -385,7 +424,7 @@ export default function AdminSourcesPage() {
       {/* Filters */}
       <div className="flex items-center gap-3 mb-4">
         <div className="flex gap-1.5">
-          {Object.entries({ all: { label: "همه", count: stats.total }, pending: { label: "انتظار", count: stats.pending }, processed: { label: "پردازش‌شده", count: stats.processed }, approved: { label: "تایید", count: stats.approved } }).map(([key, val]) => (
+          {Object.entries({ all: { label: "همه", count: stats.total }, pending: { label: "انتظار", count: stats.pending }, processed: { label: "پردازش‌شده", count: stats.processed }, approved: { label: "تایید", count: stats.approved }, archived: { label: "آرشیو", count: stats.archived } }).map(([key, val]) => (
             <button
               key={key}
               onClick={() => setFilterStatus(key)}
@@ -469,6 +508,37 @@ export default function AdminSourcesPage() {
                     >
                       {applyingId === src.id ? "..." : "اعمال"}
                     </button>
+                  )}
+                  {src.status === "archived" ? (
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleUnarchive(src.id); }}
+                        className="px-2 py-1 bg-primary/10 text-primary text-[9px] font-bold rounded-lg flex items-center gap-1"
+                        title="بازگردانی از آرشیو"
+                      >
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 109-9M3 12l3-3M3 12l3 3" /></svg>
+                        بازگردانی
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleHardDelete(src.id); }}
+                        className="px-2 py-1 bg-red-500/10 text-red-500 text-[9px] font-bold rounded-lg flex items-center gap-1"
+                        title="حذف برگشت‌ناپذیر"
+                      >
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18 M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2 M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" /></svg>
+                        حذف
+                      </button>
+                    </>
+                  ) : (
+                    (src.status === "processed" || src.status === "approved" || src.status === "rejected") && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleArchive(src.id); }}
+                        className="px-2 py-1 text-muted hover:text-foreground text-[9px] font-bold rounded-lg flex items-center gap-1"
+                        title="انتقال به آرشیو"
+                      >
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 8v13H3V8 M1 3h22v5H1z M10 12h4" /></svg>
+                        آرشیو
+                      </button>
+                    )
                   )}
 
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-muted transition-transform ${isExpanded ? "rotate-180" : ""}`}><path d="M6 9l6 6 6-6" /></svg>
