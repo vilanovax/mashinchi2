@@ -268,20 +268,26 @@ export default function AdminPricesPage() {
   if (loading) return <div className="flex items-center justify-center h-full"><div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
-    <div className="p-6">
+    <div className="p-5">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <h1 className="text-xl font-black">تاریخچه قیمت</h1>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h1 className="text-lg font-black">قیمت‌ها</h1>
+          <p className="text-[10px] text-muted">
+            {toPersianDigits(pricedCount)} دارای قیمت از {toPersianDigits(cars.length)} · {toPersianDigits(unpricedCount)} بدون قیمت
+          </p>
+        </div>
         <button onClick={openImport}
-          className="w-8 h-8 flex items-center justify-center bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors" title="ورود قیمت دسته‌جمعی">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          className="px-3.5 py-2 bg-primary text-white text-[11px] font-bold rounded-xl flex items-center gap-1.5 shadow-sm shadow-primary/20">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M12 5v14M5 12h14" />
           </svg>
+          ورود دسته‌جمعی
         </button>
       </div>
 
       {/* Searchable car selector */}
-      <div className="relative mb-5">
+      <div className="relative mb-4">
         <div className="bg-surface rounded-xl border border-border p-3">
           <div className="flex items-center gap-2">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted shrink-0">
@@ -332,33 +338,24 @@ export default function AdminPricesPage() {
       {!selectedCar && (
         <div>
           {/* Filter tabs */}
-          <div className="flex gap-1.5 mb-4">
+          <div className="flex gap-1 mb-3">
             {[
-              { key: "all" as const, label: "همه", count: cars.length, color: "primary" },
-              { key: "priced" as const, label: "دارای قیمت", count: pricedCount, color: "emerald" },
-              { key: "unpriced" as const, label: "بدون قیمت", count: unpricedCount, color: "amber" },
+              { key: "all" as const, label: "همه", count: cars.length },
+              { key: "priced" as const, label: "دارای قیمت", count: pricedCount },
+              { key: "unpriced" as const, label: "بدون قیمت", count: unpricedCount },
             ].map((f) => (
               <button key={f.key} onClick={() => setListFilter(f.key)}
-                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  listFilter === f.key
-                    ? f.color === "emerald" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                    : f.color === "amber" ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                    : "bg-primary/10 text-primary border border-primary/20"
-                    : "bg-surface border border-border text-muted hover:border-primary/20"
+                className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all border ${
+                  listFilter === f.key ? "bg-primary text-white border-primary" : "bg-surface border-border text-muted"
                 }`}>
-                {f.label}
-                <span className={`text-[10px] font-black ${listFilter === f.key ? "" : "text-muted/60"}`}>{toPersianDigits(f.count)}</span>
+                {f.label} {toPersianDigits(f.count)}
               </button>
             ))}
           </div>
 
           {/* Car list */}
-          <div className="bg-surface rounded-xl border border-border">
-            <div className="p-3 border-b border-border flex items-center justify-between">
-              <h3 className="text-xs font-black">{toPersianDigits(filteredCars.length)} خودرو</h3>
-              <span className="text-[10px] text-muted">برای مشاهده تاریخچه کلیک کنید</span>
-            </div>
-            <div className="divide-y divide-border/50 max-h-[65vh] overflow-y-auto">
+          <div className="bg-surface rounded-xl border border-border overflow-hidden">
+            <div className="divide-y divide-border/30 max-h-[70vh] overflow-y-auto">
               {filteredCars.map((c) => {
                 const hasPrice = parseInt(c.priceMin) > 0 || parseInt(c.priceMax) > 0;
                 const minNum = parseInt(c.priceMin);
@@ -366,7 +363,7 @@ export default function AdminPricesPage() {
                 const isEditing = editingCarId === c.id;
                 return (
                   <div key={c.id}
-                    className="w-full text-right px-4 py-3 hover:bg-primary/5 flex items-center gap-3 transition-colors cursor-pointer"
+                    className="w-full text-right px-3 py-2 hover:bg-primary/5 flex items-center gap-2.5 transition-colors cursor-pointer"
                     onClick={() => { if (!isEditing) { setCarSearch(""); loadPrices(c.id); } }}>
                     <div className={`w-2 h-2 rounded-full shrink-0 ${hasPrice ? "bg-emerald-500" : "bg-amber-400"}`} />
                     <div className="flex-1 min-w-0">
