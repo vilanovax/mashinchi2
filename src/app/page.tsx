@@ -143,14 +143,19 @@ export default function HomePage() {
 
         {/* Main Card */}
         <div className="w-full max-w-md bg-surface rounded-3xl shadow-xl border border-border overflow-hidden">
-          {/* Header — compact inline */}
+          {/* Header — logo + title */}
           <div className="flex items-center justify-center gap-2.5 pt-4 pb-2 px-6">
             <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-md shadow-primary/20 shrink-0">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-                <path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-                <path d="M5 17H3v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2" />
-                <path d="M9 17h6" />
+              <svg width="22" height="22" viewBox="0 0 32 32" fill="none">
+                {/* Minimal car silhouette — roof + body + wheels */}
+                <path d="M6 20h20v2a2 2 0 01-2 2H8a2 2 0 01-2-2v-2z" fill="white" opacity="0.3" />
+                <path d="M8 20l2-6h12l2 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                <path d="M10 14l1.5-4h9l1.5 4" stroke="white" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                <circle cx="10" cy="22" r="2" fill="white" />
+                <circle cx="22" cy="22" r="2" fill="white" />
+                <path d="M12 22h8" stroke="white" strokeWidth="1.5" />
+                {/* Speed lines */}
+                <path d="M4 17h3M3 19h2" stroke="white" strokeWidth="1" strokeLinecap="round" opacity="0.5" />
               </svg>
             </div>
             <div>
