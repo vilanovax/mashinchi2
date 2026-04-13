@@ -105,7 +105,7 @@ export default function AdminCarEditPage({ params }: { params: Promise<{ id: str
   const [newTag, setNewTag] = useState("");
 
   useEffect(() => {
-    fetchAdmin(`/api/admin/cars`)
+    fetchAdmin(`/api/admin/cars?full=true`)
       .then((r) => r.json())
       .then((data: CarData[]) => {
         const found = data.find((c) => c.id === id);
