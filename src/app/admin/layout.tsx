@@ -617,7 +617,45 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                                       {isReport && <span className="text-[8px] bg-orange-500/15 text-orange-600 px-1 py-0.5 rounded font-bold shrink-0">گزارش</span>}
                                     </div>
                                     <p className="text-[9px] text-muted line-clamp-2 mt-0.5 leading-4">{n.message}</p>
-                                    <span className="text-[8px] text-muted/50">{time.toLocaleDateString("fa-IR")} {time.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" })}</span>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <span className="text-[8px] text-muted/50">{time.toLocaleDateString("fa-IR")} {time.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" })}</span>
+                                      {/* Convert to source button — only for user reports with entityId */}
+                                      {isReport && n.entityId && (
+                                        <button
+                                          onClick={async (e) => {
+                                            e.stopPropagation();
+                                            try {
+                                              const res = await fetchAdmin("/api/admin/sources", {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({
+                                                  carId: n.entityId,
+                                                  type: "comment",
+                                                  sourceSite: "manual",
+                                                  title: n.title,
+                                                  rawText: n.message,
+                                                }),
+                                              });
+                                              if (res.ok) {
+                                                // Mark as read
+                                                await fetchAdmin("/api/admin/notifications", {
+                                                  method: "PUT",
+                                                  headers: { "Content-Type": "application/json" },
+                                                  body: JSON.stringify({ ids: [n.id] }),
+                                                });
+                                                setNotifs((prev) => prev.map((x) => x.id === n.id ? { ...x, isRead: true } : x));
+                                                if (!n.isRead) setUnreadCount((c) => Math.max(0, c - 1));
+                                                alert("به عنوان منبع ذخیره شد — از صفحه منابع قابل پردازشه");
+                                              }
+                                            } catch {}
+                                          }}
+                                          className="text-[8px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded hover:bg-primary/20 transition-colors flex items-center gap-0.5"
+                                        >
+                                          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 4v16m8-8H4" /></svg>
+                                          تبدیل به منبع
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                   <button
                                     onClick={async (e) => {
