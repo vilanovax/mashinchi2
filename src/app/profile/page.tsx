@@ -69,6 +69,21 @@ export default function ProfilePage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [favCompareMode, setFavCompareMode] = useState(false);
+
+  // My car experience
+  const [showMyCar, setShowMyCar] = useState(false);
+  const [myCarStep, setMyCarStep] = useState(0);
+  const [myCarId, setMyCarId] = useState("");
+  const [myCarOwnership, setMyCarOwnership] = useState("");
+  const [myCarSatisfaction, setMyCarSatisfaction] = useState(5);
+  const [myCarProblem, setMyCarProblem] = useState("");
+  const [myCarCost, setMyCarCost] = useState("");
+  const [myCarRebuy, setMyCarRebuy] = useState("");
+  const [myCarSellReason, setMyCarSellReason] = useState("");
+  const [myCarNote, setMyCarNote] = useState("");
+  const [myCarSaving, setMyCarSaving] = useState(false);
+  const [myCarSaved, setMyCarSaved] = useState(false);
+  const [allCars, setAllCars] = useState<{ id: string; nameFa: string; brandFa: string }[]>([]);
   const { toggleCompare, isInCompare, canCompare, goToCompare, count: compareCount, clearCompare } = useCompare();
 
   useEffect(() => {
@@ -82,6 +97,11 @@ export default function ProfilePage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+
+    // Load cars list for "my car" selector
+    fetch("/api/cars/list").then((r) => r.json()).then((d) => {
+      if (Array.isArray(d)) setAllCars(d);
+    }).catch(() => {});
   }, []);
 
   const openCarDetail = async (carId: string) => {
@@ -520,6 +540,219 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+        {/* ─── My Car Experience ─── */}
+        <div className="px-5 mb-4">
+          {!showMyCar && !myCarSaved ? (
+            <button
+              onClick={() => { setShowMyCar(true); setMyCarStep(0); }}
+              className="w-full bg-surface rounded-2xl border border-border p-4 flex items-center gap-3 hover:border-primary/30 transition-colors text-right"
+            >
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
+                  <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M5 17H3v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2M9 17h6" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="text-xs font-black">خودروی فعلی من</div>
+                <p className="text-[10px] text-muted mt-0.5">تجربه‌ت رو ثبت کن و به بقیه کمک کن</p>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted shrink-0 rotate-180">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </button>
+          ) : myCarSaved ? (
+            <div className="w-full bg-emerald-500/5 rounded-2xl border border-emerald-500/20 p-4 text-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-600 mx-auto mb-1"><path d="M20 6L9 17l-5-5" /></svg>
+              <p className="text-xs font-bold text-emerald-600">تجربه‌ات ثبت شد، ممنون!</p>
+              <p className="text-[9px] text-muted mt-0.5">این اطلاعات به کاربران دیگه کمک می‌کنه</p>
+            </div>
+          ) : (
+            <div className="w-full bg-surface rounded-2xl border border-border p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-black flex items-center gap-1.5">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
+                    <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M5 17H3v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2M9 17h6" />
+                  </svg>
+                  خودروی فعلی من
+                </h3>
+                <button onClick={() => setShowMyCar(false)} className="text-[9px] text-muted">بستن</button>
+              </div>
+
+              {/* Progress dots */}
+              <div className="flex items-center justify-center gap-1 mb-4">
+                {[0, 1, 2, 3, 4, 5, 6].map((s) => (
+                  <div key={s} className={`w-1.5 h-1.5 rounded-full transition-all ${s === myCarStep ? "w-4 bg-primary" : s < myCarStep ? "bg-primary/40" : "bg-border"}`} />
+                ))}
+              </div>
+
+              {/* Step 0: Select car */}
+              {myCarStep === 0 && (
+                <div>
+                  <p className="text-[11px] font-bold mb-2">خودروت چیه؟</p>
+                  <select
+                    value={myCarId}
+                    onChange={(e) => setMyCarId(e.target.value)}
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-xs outline-none focus:border-primary"
+                  >
+                    <option value="">انتخاب خودرو...</option>
+                    {allCars.map((c) => <option key={c.id} value={c.id}>{c.nameFa} — {c.brandFa}</option>)}
+                  </select>
+                  <button onClick={() => myCarId && setMyCarStep(1)} disabled={!myCarId}
+                    className="w-full mt-3 py-2.5 bg-primary text-white text-xs font-bold rounded-xl disabled:opacity-40">بعدی</button>
+                </div>
+              )}
+
+              {/* Step 1: Ownership duration */}
+              {myCarStep === 1 && (
+                <div>
+                  <p className="text-[11px] font-bold mb-2">چند وقته مالکشی؟</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {["کمتر از ۶ ماه", "۶ ماه تا ۱ سال", "۱ تا ۳ سال", "بیش از ۳ سال"].map((opt) => (
+                      <button key={opt} onClick={() => { setMyCarOwnership(opt); setMyCarStep(2); }}
+                        className={`py-2.5 rounded-xl text-[11px] font-bold border transition-all ${myCarOwnership === opt ? "bg-primary/10 border-primary text-primary" : "bg-background border-border text-muted"}`}>
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Satisfaction */}
+              {myCarStep === 2 && (
+                <div>
+                  <p className="text-[11px] font-bold mb-2">رضایت کلی از ۱ تا ۱۰؟</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-muted">ناراضی</span>
+                    <input type="range" min={1} max={10} value={myCarSatisfaction}
+                      onChange={(e) => setMyCarSatisfaction(Number(e.target.value))} className="flex-1" />
+                    <span className="text-[10px] text-muted">عالی</span>
+                  </div>
+                  <div className={`text-center text-2xl font-black my-2 ${myCarSatisfaction >= 7 ? "text-emerald-600" : myCarSatisfaction >= 4 ? "text-primary" : "text-red-500"}`}>
+                    {toPersianDigits(myCarSatisfaction)}
+                  </div>
+                  <button onClick={() => setMyCarStep(3)} className="w-full py-2.5 bg-primary text-white text-xs font-bold rounded-xl">بعدی</button>
+                </div>
+              )}
+
+              {/* Step 3: Biggest problem */}
+              {myCarStep === 3 && (
+                <div>
+                  <p className="text-[11px] font-bold mb-2">بزرگ‌ترین مشکل؟</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {["موتور", "گیربکس", "برق", "بدنه", "تعلیق", "مشکلی نداشتم"].map((opt) => (
+                      <button key={opt} onClick={() => { setMyCarProblem(opt); setMyCarStep(4); }}
+                        className={`py-2 rounded-xl text-[10px] font-bold border transition-all ${myCarProblem === opt ? "bg-primary/10 border-primary text-primary" : "bg-background border-border text-muted"}`}>
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 4: Monthly cost */}
+              {myCarStep === 4 && (
+                <div>
+                  <p className="text-[11px] font-bold mb-2">هزینه ماهانه نگهداری؟</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {["زیر ۵۰۰ هزار", "۵۰۰ هزار تا ۱ میلیون", "۱ تا ۲ میلیون", "بالای ۲ میلیون"].map((opt) => (
+                      <button key={opt} onClick={() => { setMyCarCost(opt); setMyCarStep(5); }}
+                        className={`py-2.5 rounded-xl text-[10px] font-bold border transition-all ${myCarCost === opt ? "bg-primary/10 border-primary text-primary" : "bg-background border-border text-muted"}`}>
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 5: Would rebuy + sell reason */}
+              {myCarStep === 5 && (
+                <div>
+                  <p className="text-[11px] font-bold mb-2">دوباره همین خودرو رو می‌خری؟</p>
+                  <div className="flex gap-1.5 mb-3">
+                    {["بله", "شاید", "نه"].map((opt) => (
+                      <button key={opt} onClick={() => setMyCarRebuy(opt)}
+                        className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold border transition-all ${myCarRebuy === opt ? "bg-primary/10 border-primary text-primary" : "bg-background border-border text-muted"}`}>
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] font-bold mb-2">اگه می‌خوای بفروشی، دلیلش؟</p>
+                  <div className="grid grid-cols-2 gap-1.5 mb-3">
+                    {["ارتقا می‌خوام", "مشکل فنی داره", "نیاز مالی", "نمی‌خوام بفروشم"].map((opt) => (
+                      <button key={opt} onClick={() => setMyCarSellReason(opt)}
+                        className={`py-2 rounded-xl text-[10px] font-bold border transition-all ${myCarSellReason === opt ? "bg-primary/10 border-primary text-primary" : "bg-background border-border text-muted"}`}>
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={() => setMyCarStep(6)} disabled={!myCarRebuy}
+                    className="w-full py-2.5 bg-primary text-white text-xs font-bold rounded-xl disabled:opacity-40">بعدی</button>
+                </div>
+              )}
+
+              {/* Step 6: Optional note + submit */}
+              {myCarStep === 6 && (
+                <div>
+                  <p className="text-[11px] font-bold mb-2">یه چیز دیگه هم می‌خوای بگی؟ (اختیاری)</p>
+                  <textarea
+                    value={myCarNote}
+                    onChange={(e) => setMyCarNote(e.target.value)}
+                    placeholder="مثلا: لوازم یدکی گرونه، مصرف واقعی بیشتر از اعلامیه..."
+                    rows={3}
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs leading-6 outline-none resize-none focus:border-primary mb-3"
+                  />
+                  <button
+                    onClick={async () => {
+                      setMyCarSaving(true);
+                      try {
+                        await fetch("/api/report", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            carId: myCarId,
+                            carName: allCars.find((c) => c.id === myCarId)?.nameFa || "",
+                            type: "experience",
+                            text: [
+                              `مدت مالکیت: ${myCarOwnership}`,
+                              `رضایت: ${myCarSatisfaction}/10`,
+                              `بزرگ‌ترین مشکل: ${myCarProblem}`,
+                              `هزینه ماهانه: ${myCarCost}`,
+                              `خرید مجدد: ${myCarRebuy}`,
+                              `دلیل فروش: ${myCarSellReason}`,
+                              myCarNote ? `یادداشت: ${myCarNote}` : "",
+                            ].filter(Boolean).join("\n"),
+                          }),
+                        });
+                        setMyCarSaved(true);
+                        setShowMyCar(false);
+                      } catch {}
+                      setMyCarSaving(false);
+                    }}
+                    disabled={myCarSaving}
+                    className="w-full py-3 bg-primary text-white text-sm font-bold rounded-xl disabled:opacity-40 flex items-center justify-center gap-1.5"
+                  >
+                    {myCarSaving ? (
+                      <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> ارسال...</>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
+                        ثبت تجربه
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Back button (except step 0) */}
+              {myCarStep > 0 && myCarStep < 6 && (
+                <button onClick={() => setMyCarStep(myCarStep - 1)} className="w-full mt-2 text-[10px] text-muted hover:text-foreground text-center">
+                  ← قبلی
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Settings Section */}
         <div className="px-5 mb-6">
