@@ -13,17 +13,31 @@ interface AuditEntry {
   createdAt: string;
 }
 
-const ACTION_LABELS: Record<string, { label: string; color: string }> = {
-  create: { label: "ایجاد", color: "bg-accent/10 text-accent" },
-  update: { label: "بروزرسانی", color: "bg-primary/10 text-primary" },
-  delete: { label: "حذف", color: "bg-danger/10 text-danger" },
-  import: { label: "واردات", color: "bg-violet-500/10 text-violet-600" },
-  ai_generate: { label: "تولید AI", color: "bg-amber-500/10 text-amber-600" },
+const ACTION_COLORS: Record<string, string> = {
+  create: "bg-emerald-500",
+  update: "bg-primary",
+  delete: "bg-red-500",
+  import: "bg-violet-500",
+  ai_generate: "bg-amber-500",
+};
+
+const ACTION_LABELS: Record<string, string> = {
+  create: "ایجاد", update: "بروزرسانی", delete: "حذف",
+  import: "واردات", ai_generate: "تولید AI",
 };
 
 const ENTITY_LABELS: Record<string, string> = {
-  car: "خودرو", review: "نظر", crawler: "کرالر", price: "قیمت", settings: "تنظیمات",
+  car: "خودرو", review: "نظر", crawler: "کرالر", price: "قیمت",
+  settings: "تنظیمات", source: "منبع", admin: "ادمین",
 };
+
+function extractName(entry: AuditEntry): string {
+  const d = entry.details;
+  if (d?.nameFa) return String(d.nameFa);
+  if (d?.carName) return String(d.carName);
+  if (d?.action) return String(d.action);
+  return "";
+}
 
 export default function AdminAuditPage() {
   const { fetchAdmin } = useAdmin();
@@ -39,77 +53,113 @@ export default function AdminAuditPage() {
 
   if (loading) return <div className="flex items-center justify-center h-full"><div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
 
+  // Entity types present in data
+  const entityTypes = [...new Set(logs.map((l) => l.entity))];
   const filtered = filterEntity === "all" ? logs : logs.filter((l) => l.entity === filterEntity);
 
+  // Group by date
+  const grouped: Record<string, AuditEntry[]> = {};
+  for (const log of filtered) {
+    const dateKey = new Date(log.createdAt).toLocaleDateString("fa-IR");
+    if (!grouped[dateKey]) grouped[dateKey] = [];
+    grouped[dateKey].push(log);
+  }
+
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-5">
-        <h1 className="text-xl font-black">لاگ عملیات</h1>
-        <span className="text-sm text-muted">{toPersianDigits(filtered.length)} رکورد</span>
+    <div className="p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h1 className="text-lg font-black">لاگ عملیات</h1>
+          <p className="text-[10px] text-muted">{toPersianDigits(filtered.length)} رکورد</p>
+        </div>
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-1.5 mb-4">
-        {["all", "car", "review", "crawler", "price", "settings"].map((e) => (
-          <button
-            key={e}
-            onClick={() => setFilterEntity(e)}
-            className={`text-[11px] px-3 py-1 rounded-full font-bold transition-colors ${
-              filterEntity === e ? "bg-primary text-white" : "bg-background text-muted"
-            }`}
-          >
-            {e === "all" ? "همه" : ENTITY_LABELS[e] || e}
+      {/* Filter — dynamic based on data */}
+      <div className="flex gap-1 mb-4">
+        <button onClick={() => setFilterEntity("all")}
+          className={`text-[9px] px-2.5 py-1 rounded-full font-bold border ${filterEntity === "all" ? "bg-primary text-white border-primary" : "bg-surface border-border text-muted"}`}>
+          همه {toPersianDigits(logs.length)}
+        </button>
+        {entityTypes.map((e) => (
+          <button key={e} onClick={() => setFilterEntity(filterEntity === e ? "all" : e)}
+            className={`text-[9px] px-2.5 py-1 rounded-full font-bold border ${filterEntity === e ? "bg-primary text-white border-primary" : "bg-surface border-border text-muted"}`}>
+            {ENTITY_LABELS[e] || e} {toPersianDigits(logs.filter((l) => l.entity === e).length)}
           </button>
         ))}
       </div>
 
-      {/* Log list */}
-      <div className="space-y-1.5">
-        {filtered.map((log) => {
-          const actionInfo = ACTION_LABELS[log.action] || { label: log.action, color: "bg-background text-muted" };
-          const isExpanded = expandedLog === log.id;
-
-          return (
-            <div
-              key={log.id}
-              className="bg-surface rounded-xl border border-border overflow-hidden"
-            >
-              <div
-                onClick={() => setExpandedLog(isExpanded ? null : log.id)}
-                className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-background/30 transition-colors"
-              >
-                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${actionInfo.color}`}>
-                  {actionInfo.label}
-                </span>
-                <span className="text-[10px] bg-background px-2 py-0.5 rounded-full shrink-0">
-                  {ENTITY_LABELS[log.entity] || log.entity}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <span className="text-xs truncate block">
-                    {log.details?.nameFa ? String(log.details.nameFa) : log.entityId ? `ID: ${log.entityId.slice(0, 8)}...` : "-"}
-                  </span>
-                </div>
-                <span className="text-[10px] text-muted shrink-0">
-                  {new Date(log.createdAt).toLocaleDateString("fa-IR")} {new Date(log.createdAt).toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" })}
-                </span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-muted transition-transform ${isExpanded ? "rotate-180" : ""}`}>
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              </div>
-
-              {isExpanded && (
-                <div className="px-4 pb-3 border-t border-border/50 pt-2">
-                  <pre className="text-[10px] bg-background rounded-lg p-3 overflow-x-auto whitespace-pre-wrap leading-5" dir="ltr">
-                    {JSON.stringify(log.details, null, 2)}
-                  </pre>
-                </div>
-              )}
+      {/* Timeline grouped by date */}
+      <div className="space-y-4">
+        {Object.entries(grouped).map(([date, entries]) => (
+          <div key={date}>
+            {/* Date header */}
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-[10px] font-bold text-muted bg-background px-2 py-0.5 rounded">{date}</span>
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-[9px] text-muted/60">{toPersianDigits(entries.length)}</span>
             </div>
-          );
-        })}
+
+            {/* Entries */}
+            <div className="bg-surface rounded-xl border border-border overflow-hidden divide-y divide-border/30">
+              {entries.map((log) => {
+                const dotColor = ACTION_COLORS[log.action] || "bg-muted";
+                const actionLabel = ACTION_LABELS[log.action] || log.action;
+                const entityLabel = ENTITY_LABELS[log.entity] || log.entity;
+                const name = extractName(log);
+                const time = new Date(log.createdAt).toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" });
+                const isExpanded = expandedLog === log.id;
+
+                return (
+                  <div key={log.id}>
+                    <div
+                      onClick={() => setExpandedLog(isExpanded ? null : log.id)}
+                      className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-background/40 transition-colors"
+                    >
+                      {/* Time */}
+                      <span className="text-[9px] text-muted/60 w-10 shrink-0 font-mono">{time}</span>
+
+                      {/* Dot */}
+                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+
+                      {/* Action + Entity + Name */}
+                      <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-foreground">{actionLabel}</span>
+                        <span className="text-[9px] text-muted">{entityLabel}</span>
+                        {name && (
+                          <>
+                            <span className="text-muted/30">·</span>
+                            <span className="text-[10px] text-foreground truncate">{name}</span>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Expand indicator */}
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-muted/30 transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`}>
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    </div>
+
+                    {isExpanded && Object.keys(log.details).length > 0 && (
+                      <div className="px-3 pb-2 pt-1 border-t border-border/20">
+                        <div className="bg-background rounded-lg px-3 py-2 text-[9px] font-mono leading-5 max-h-[150px] overflow-y-auto" dir="ltr">
+                          {Object.entries(log.details).map(([key, val]) => (
+                            <div key={key} className="flex gap-2">
+                              <span className="text-muted shrink-0">{key}:</span>
+                              <span className="text-foreground break-all">{typeof val === "object" ? JSON.stringify(val) : String(val)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
 
         {filtered.length === 0 && (
-          <p className="text-sm text-muted text-center py-8">هیچ لاگی ثبت نشده</p>
+          <p className="text-xs text-muted text-center py-8">هیچ لاگی ثبت نشده</p>
         )}
       </div>
     </div>
