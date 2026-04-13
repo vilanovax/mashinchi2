@@ -165,16 +165,10 @@ export default function ProfilePage() {
     <div className="flex-1 flex flex-col page-transition">
       <div className="flex-1 overflow-y-auto">
 
-        {/* Profile Header with Avatar */}
+        {/* Profile Header */}
         {profile?.hasProfile ? (
-          <div className="px-5 pt-5 pb-3">
-            <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-accent/8 rounded-2xl p-5 relative overflow-hidden">
-              {/* Background pattern */}
-              <div className="absolute inset-0 opacity-[0.03]">
-                <svg width="100%" height="100%" viewBox="0 0 100 100" fill="currentColor">
-                  <circle cx="20" cy="20" r="15" /><circle cx="80" cy="30" r="10" /><circle cx="50" cy="70" r="12" />
-                </svg>
-              </div>
+          <div className="px-5 pt-4 pb-2">
+            <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-accent/8 rounded-2xl p-4 relative overflow-hidden">
 
               <div className="relative">
                 {/* Avatar + Main Type */}
@@ -576,14 +570,17 @@ export default function ProfilePage() {
                   </svg>
                   خودروی فعلی من
                 </h3>
-                <button onClick={() => setShowMyCar(false)} className="text-[9px] text-muted">بستن</button>
+                <button onClick={() => setShowMyCar(false)} className="text-[10px] text-muted hover:text-foreground font-bold px-2 py-0.5 rounded-lg hover:bg-background transition-colors">بستن ×</button>
               </div>
 
-              {/* Progress dots */}
-              <div className="flex items-center justify-center gap-1 mb-4">
-                {[0, 1, 2, 3, 4, 5, 6].map((s) => (
-                  <div key={s} className={`w-1.5 h-1.5 rounded-full transition-all ${s === myCarStep ? "w-4 bg-primary" : s < myCarStep ? "bg-primary/40" : "bg-border"}`} />
-                ))}
+              {/* Progress — step label + dots */}
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[9px] text-muted">مرحله {toPersianDigits(myCarStep + 1)} از ۷</span>
+                <div className="flex items-center gap-1">
+                  {[0, 1, 2, 3, 4, 5, 6].map((s) => (
+                    <div key={s} className={`h-1 rounded-full transition-all ${s === myCarStep ? "w-4 bg-primary" : s < myCarStep ? "w-1.5 bg-primary/40" : "w-1.5 bg-border"}`} />
+                  ))}
+                </div>
               </div>
 
               {/* Step 0: Select car */}
@@ -745,9 +742,9 @@ export default function ProfilePage() {
               )}
 
               {/* Back button (except step 0) */}
-              {myCarStep > 0 && myCarStep < 6 && (
-                <button onClick={() => setMyCarStep(myCarStep - 1)} className="w-full mt-2 text-[10px] text-muted hover:text-foreground text-center">
-                  ← قبلی
+              {myCarStep > 0 && (
+                <button onClick={() => setMyCarStep(myCarStep - 1)} className="w-full mt-2 text-[10px] text-muted hover:text-foreground text-center font-bold">
+                  → مرحله قبل
                 </button>
               )}
             </div>
