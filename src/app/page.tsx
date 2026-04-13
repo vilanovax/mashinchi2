@@ -78,7 +78,7 @@ export default function HomePage() {
   return (
     <div className="flex-1 flex flex-col page-transition relative">
       {/* Top Bar */}
-      <div className="flex items-center justify-between px-5 pt-3">
+      <div className="flex items-center justify-between px-5 pt-2">
         <div />
         <button
           onClick={() => setShowSettings(!showSettings)}
@@ -119,9 +119,9 @@ export default function HomePage() {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-5 -mt-4">
+      <div className="flex-1 flex flex-col items-center justify-center px-5 -mt-8">
         {/* Steps — before the card */}
-        <div className="w-full max-w-md flex items-center gap-2 px-4 mb-4">
+        <div className="w-full max-w-md flex items-center gap-2 px-6 mb-3">
           {[
             { num: "۱", label: "بودجه", active: true },
             { num: "۲", label: "انتخاب", active: false },
@@ -143,18 +143,20 @@ export default function HomePage() {
 
         {/* Main Card */}
         <div className="w-full max-w-md bg-surface rounded-3xl shadow-xl border border-border overflow-hidden">
-          {/* Header */}
-          <div className="text-center pt-5 pb-3 px-6">
-            <div className="w-12 h-12 mx-auto mb-2 bg-primary rounded-xl flex items-center justify-center shadow-md shadow-primary/20">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {/* Header — compact inline */}
+          <div className="flex items-center justify-center gap-2.5 pt-4 pb-2 px-6">
+            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-md shadow-primary/20 shrink-0">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
                 <path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
                 <path d="M5 17H3v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2" />
                 <path d="M9 17h6" />
               </svg>
             </div>
-            <h1 className="text-xl font-black text-foreground">ماشینچی</h1>
-            <p className="text-muted text-xs mt-0.5">دستیار هوشمند خرید خودرو</p>
+            <div>
+              <h1 className="text-lg font-black text-foreground leading-tight">ماشینچی</h1>
+              <p className="text-muted text-[10px]">دستیار هوشمند خرید خودرو</p>
+            </div>
           </div>
 
           {/* Budget section */}
@@ -235,12 +237,12 @@ export default function HomePage() {
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-500"><path d="M20 6L9 17l-5-5" /></svg>
                 {toPersianDigits(137)} خودرو
               </span>
-              <span className="text-border">|</span>
+              <span className="text-border">·</span>
               <span className="flex items-center gap-1">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-500"><path d="M20 6L9 17l-5-5" /></svg>
                 مقایسه هوشمند
               </span>
-              <span className="text-border">|</span>
+              <span className="text-border">·</span>
               <span className="flex items-center gap-1">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-500"><path d="M20 6L9 17l-5-5" /></svg>
                 رایگان
