@@ -286,76 +286,41 @@ export default function AdminPricesPage() {
         </button>
       </div>
 
-      {/* Searchable car selector */}
-      <div className="relative mb-4">
-        <div className="bg-surface rounded-xl border border-border p-3">
-          <div className="flex items-center gap-2">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted shrink-0">
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-            </svg>
-            <input
-              value={selectedCar ? (selectedCarData ? `${selectedCarData.nameFa} - ${selectedCarData.brandFa}` : "") : carSearch}
-              onChange={(e) => { setCarSearch(e.target.value); setShowCarList(true); if (selectedCar) { setSelectedCar(""); setPrices([]); } }}
-              onFocus={() => setShowCarList(true)}
-              placeholder="جستجوی خودرو..."
-              className="flex-1 bg-transparent text-sm outline-none"
-            />
-            {(selectedCar || carSearch) && (
-              <button onClick={() => { setSelectedCar(""); setPrices([]); setCarSearch(""); setShowCarList(false); }} className="text-muted hover:text-foreground">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Car dropdown */}
-        {showCarList && !selectedCar && (
-          <div className="absolute z-20 top-full mt-1 w-full bg-surface border border-border rounded-xl shadow-xl max-h-64 overflow-y-auto">
-            {filteredCars.length === 0 ? (
-              <div className="p-4 text-center text-xs text-muted">خودرویی یافت نشد</div>
-            ) : (
-              filteredCars.map((c) => (
-                <button key={c.id} onClick={() => { setCarSearch(""); loadPrices(c.id); }}
-                  className="w-full text-right px-4 py-2.5 hover:bg-primary/5 flex items-center justify-between transition-colors border-b border-border/50 last:border-0">
-                  <div>
-                    <span className="text-sm font-bold">{c.nameFa}</span>
-                    <span className="text-xs text-muted mr-2">{c.brandFa}</span>
-                  </div>
-                  <span className="text-[10px] text-muted">{formatPriceRange(c.priceMin, c.priceMax)}</span>
-                </button>
-              ))
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Close dropdown on outside click */}
-      {showCarList && !selectedCar && (
-        <div className="fixed inset-0 z-10" onClick={() => setShowCarList(false)} />
-      )}
-
       {/* Dashboard view when no car selected */}
       {!selectedCar && (
         <div>
-          {/* Filter tabs */}
-          <div className="flex gap-1 mb-3">
-            {[
-              { key: "all" as const, label: "همه", count: cars.length },
-              { key: "priced" as const, label: "دارای قیمت", count: pricedCount },
-              { key: "unpriced" as const, label: "بدون قیمت", count: unpricedCount },
-            ].map((f) => (
-              <button key={f.key} onClick={() => setListFilter(f.key)}
-                className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all border ${
-                  listFilter === f.key ? "bg-primary text-white border-primary" : "bg-surface border-border text-muted"
-                }`}>
-                {f.label} {toPersianDigits(f.count)}
-              </button>
-            ))}
+          {/* Search + Filters — single row */}
+          <div className="flex items-center gap-2 mb-3">
+            <div className="relative flex-1 max-w-[220px]">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted">
+                <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+              </svg>
+              <input
+                value={carSearch}
+                onChange={(e) => setCarSearch(e.target.value)}
+                placeholder="جستجو..."
+                className="w-full bg-surface border border-border rounded-lg pr-8 pl-3 py-1.5 text-[11px] outline-none focus:border-primary"
+              />
+            </div>
+            <div className="flex gap-1">
+              {[
+                { key: "all" as const, label: "همه", count: cars.length },
+                { key: "priced" as const, label: "دارای قیمت", count: pricedCount },
+                { key: "unpriced" as const, label: "بدون قیمت", count: unpricedCount },
+              ].map((f) => (
+                <button key={f.key} onClick={() => setListFilter(f.key)}
+                  className={`px-2.5 py-1.5 rounded-full text-[9px] font-bold transition-all border ${
+                    listFilter === f.key ? "bg-primary text-white border-primary" : "bg-surface border-border text-muted"
+                  }`}>
+                  {f.label} {toPersianDigits(f.count)}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Car list */}
+          {/* Car list — table style */}
           <div className="bg-surface rounded-xl border border-border overflow-hidden">
-            <div className="divide-y divide-border/30 max-h-[70vh] overflow-y-auto">
+            <div className="divide-y divide-border/30 max-h-[75vh] overflow-y-auto">
               {filteredCars.map((c) => {
                 const hasPrice = parseInt(c.priceMin) > 0 || parseInt(c.priceMax) > 0;
                 const minNum = parseInt(c.priceMin);
@@ -363,17 +328,17 @@ export default function AdminPricesPage() {
                 const isEditing = editingCarId === c.id;
                 return (
                   <div key={c.id}
-                    className="w-full text-right px-3 py-2 hover:bg-primary/5 flex items-center gap-2.5 transition-colors cursor-pointer"
+                    className="w-full text-right px-3 py-1.5 hover:bg-primary/5 flex items-center gap-2 transition-colors cursor-pointer"
                     onClick={() => { if (!isEditing) { setCarSearch(""); loadPrices(c.id); } }}>
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${hasPrice ? "bg-emerald-500" : "bg-amber-400"}`} />
+                    {/* Name */}
                     <div className="flex-1 min-w-0">
-                      <span className="text-sm font-bold">{c.nameFa}</span>
-                      <span className="text-[11px] text-muted mr-2">{c.brandFa}</span>
+                      <span className="text-[11px] font-bold">{c.nameFa}</span>
+                      <span className="text-[9px] text-muted mr-1.5">{c.brandFa}</span>
                     </div>
 
                     {/* Price display / inline edit */}
                     {isEditing ? (
-                      <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <input
                           autoFocus
                           value={editPrice}
@@ -381,55 +346,87 @@ export default function AdminPricesPage() {
                           onKeyDown={(e) => { if (e.key === "Enter") saveEdit(c.id, e as unknown as React.MouseEvent); if (e.key === "Escape") cancelEdit(); }}
                           type="text" inputMode="decimal"
                           placeholder="۱.۸"
-                          className="w-20 bg-background border border-primary/30 rounded-lg px-2 py-1 text-xs font-bold outline-none text-center focus:border-primary"
+                          className="w-16 bg-background border border-primary/30 rounded px-2 py-1 text-[10px] font-bold outline-none text-center focus:border-primary"
                         />
-                        <span className="text-[9px] text-muted">میلیارد</span>
+                        <span className="text-[8px] text-muted">میلیارد</span>
                         <button onClick={(e) => saveEdit(c.id, e)} disabled={editSaving}
-                          className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12l5 5L20 7" /></svg>
+                          className="w-5 h-5 flex items-center justify-center rounded bg-emerald-500 text-white disabled:opacity-50">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12l5 5L20 7" /></svg>
                         </button>
                         <button onClick={cancelEdit}
-                          className="w-6 h-6 flex items-center justify-center rounded-md bg-background border border-border text-muted hover:text-foreground">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                          className="w-5 h-5 flex items-center justify-center rounded bg-background border border-border text-muted">
+                          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
                         </button>
                       </div>
                     ) : (
-                      <div className="shrink-0 text-left flex items-center gap-1.5">
-                        <div>
-                          {hasPrice ? (
-                            <>
-                              <span className="text-xs font-black text-foreground">{toPersianDigits(formatBillion(minNum))}</span>
-                              {maxNum > 0 && maxNum !== minNum && (
-                                <span className="text-[10px] text-muted"> ~ {toPersianDigits(formatBillion(maxNum))}</span>
-                              )}
-                            </>
-                          ) : (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500">بدون قیمت</span>
-                          )}
-                        </div>
-                        <button onClick={(e) => startEdit(c, e)} title="ویرایش قیمت"
-                          className="w-6 h-6 flex items-center justify-center rounded-md text-muted/40 hover:text-primary hover:bg-primary/5 transition-colors">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <div className="shrink-0 w-36 text-left flex items-center justify-end gap-1">
+                        {hasPrice ? (
+                          <span className="text-[11px] font-black text-foreground">
+                            {toPersianDigits(formatBillion(minNum))}
+                            {maxNum > 0 && maxNum !== minNum && (
+                              <span className="text-[9px] text-muted font-normal"> ~ {toPersianDigits(formatBillion(maxNum))}</span>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-muted/40">—</span>
+                        )}
+                        <button onClick={(e) => startEdit(c, e)} title="ویرایش سریع"
+                          className="w-5 h-5 flex items-center justify-center rounded text-muted/30 hover:text-primary hover:bg-primary/5 transition-colors">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                           </svg>
                         </button>
                       </div>
                     )}
-
-                    {!isEditing && (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted/30 shrink-0 rotate-180">
-                        <path d="m9 18 6-6-6-6" />
-                      </svg>
-                    )}
                   </div>
                 );
               })}
               {filteredCars.length === 0 && (
-                <div className="p-8 text-center text-xs text-muted">خودرویی یافت نشد</div>
+                <div className="p-6 text-center text-xs text-muted">خودرویی یافت نشد</div>
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Car detail — search overlay for switching */}
+      {selectedCar && (
+        <div className="relative mb-3">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted">
+                <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+              </svg>
+              <input
+                value={carSearch || (selectedCarData ? `${selectedCarData.nameFa} - ${selectedCarData.brandFa}` : "")}
+                onChange={(e) => { setCarSearch(e.target.value); setShowCarList(true); if (selectedCar) { setSelectedCar(""); setPrices([]); } }}
+                onFocus={() => setShowCarList(true)}
+                placeholder="جستجوی خودرو..."
+                className="w-full bg-surface border border-border rounded-lg pr-8 pl-3 py-1.5 text-[11px] outline-none focus:border-primary"
+              />
+            </div>
+            {selectedCar && (
+              <button onClick={() => { setSelectedCar(""); setPrices([]); setCarSearch(""); setShowCarList(false); }}
+                className="text-[10px] text-muted hover:text-foreground font-bold">بازگشت به لیست</button>
+            )}
+          </div>
+
+          {/* Dropdown */}
+          {showCarList && !selectedCar && (
+            <div className="absolute z-20 top-full mt-1 w-full bg-surface border border-border rounded-xl shadow-xl max-h-48 overflow-y-auto">
+              {filteredCars.length === 0 ? (
+                <div className="p-3 text-center text-[10px] text-muted">یافت نشد</div>
+              ) : (
+                filteredCars.slice(0, 15).map((c) => (
+                  <button key={c.id} onClick={() => { setCarSearch(""); loadPrices(c.id); }}
+                    className="w-full text-right px-3 py-1.5 hover:bg-primary/5 flex items-center justify-between text-[11px] border-b border-border/30 last:border-0">
+                    <span className="font-bold">{c.nameFa} <span className="text-muted font-normal">{c.brandFa}</span></span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+          {showCarList && !selectedCar && <div className="fixed inset-0 z-10" onClick={() => setShowCarList(false)} />}
         </div>
       )}
 
