@@ -116,6 +116,13 @@ export default function CatalogPage() {
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [compareMode, setCompareMode] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+
+  // Report modal
+  const [showReport, setShowReport] = useState(false);
+  const [reportType, setReportType] = useState<"wrong_info" | "suggestion" | "experience">("wrong_info");
+  const [reportText, setReportText] = useState("");
+  const [reportSending, setReportSending] = useState(false);
+  const [reportSent, setReportSent] = useState(false);
   const { compareIds, toggleCompare, isInCompare, canCompare, goToCompare, count: compareCount, clearCompare } = useCompare();
 
   useEffect(() => {
@@ -613,6 +620,17 @@ export default function CatalogPage() {
                   <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7z" />
                 </svg>
                 </button>
+                {/* Report button */}
+                <button
+                  onClick={() => { setShowReport(true); setReportSent(false); setReportText(""); }}
+                  title="گزارش"
+                  className="w-9 h-9 rounded-full bg-background flex items-center justify-center text-muted hover:text-orange-500 transition-colors"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                    <line x1="4" y1="22" x2="4" y2="15" />
+                  </svg>
+                </button>
               </div>
             </div>
 
@@ -709,7 +727,7 @@ export default function CatalogPage() {
                           <div
                             className={`h-full rounded-full ${
                               key === "maintenanceRisk"
-                                ? score >= 7 ? "bg-danger" : score >= 4 ? "bg-yellow-500" : "bg-accent"
+                                ? score >= 7 ? "bg-danger" : score >= 4 ? "bg-orange-500" : "bg-accent"
                                 : score >= 7 ? "bg-accent" : score >= 4 ? "bg-primary" : "bg-danger"
                             }`}
                             style={{ width: `${(score / 10) * 100}%` }}
@@ -725,17 +743,20 @@ export default function CatalogPage() {
 
             {/* Warnings */}
             {selectedCar.intel && (selectedCar.intel.commonIssues.length > 0 || selectedCar.intel.purchaseWarnings.length > 0) && (
-              <div className="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800/30 rounded-xl p-4">
-                <h4 className="text-xs font-black text-yellow-700 dark:text-yellow-400 mb-2">هشدارها</h4>
+              <div className="bg-red-500/5 border border-red-500/15 rounded-xl p-4">
+                <h4 className="text-xs font-black text-red-600 dark:text-red-400 mb-2 flex items-center gap-1.5">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 004.99 19z" /></svg>
+                  هشدارها
+                </h4>
                 <div className="space-y-1.5">
                   {selectedCar.intel.purchaseWarnings.map((w, i) => (
-                    <div key={`w-${i}`} className="flex items-start gap-1.5 text-[11px] text-danger">
-                      <span className="shrink-0 mt-px font-bold">!</span><span>{w}</span>
+                    <div key={`w-${i}`} className="flex items-start gap-1.5 text-[11px] text-red-600 dark:text-red-400">
+                      <span className="shrink-0 mt-0.5 font-black">!</span><span className="leading-5">{w}</span>
                     </div>
                   ))}
                   {selectedCar.intel.commonIssues.map((issue, i) => (
-                    <div key={`i-${i}`} className="flex items-start gap-1.5 text-[11px] text-yellow-700 dark:text-yellow-400">
-                      <span className="shrink-0 mt-px font-bold">!</span><span>{issue}</span>
+                    <div key={`i-${i}`} className="flex items-start gap-1.5 text-[11px] text-orange-600 dark:text-orange-400">
+                      <span className="shrink-0 mt-0.5 font-black">!</span><span className="leading-5">{issue}</span>
                     </div>
                   ))}
                 </div>
@@ -773,6 +794,99 @@ export default function CatalogPage() {
           </div>
         ) : null}
       </BottomSheet>
+
+      {/* ─── Report Modal ─── */}
+      {showReport && selectedCar && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-[60]" onClick={() => !reportSending && setShowReport(false)} />
+          <div className="fixed bottom-0 left-0 right-0 bg-surface rounded-t-2xl z-[60] shadow-2xl max-h-[70vh] overflow-y-auto safe-bottom">
+            <div className="w-10 h-1 bg-border rounded-full mx-auto mt-2 mb-3" />
+            <div className="px-5 pb-6">
+              <h3 className="text-sm font-black mb-1">گزارش درباره {selectedCar.nameFa}</h3>
+              <p className="text-[10px] text-muted mb-4">کمک کن اطلاعات رو بهتر کنیم</p>
+
+              {reportSent ? (
+                <div className="text-center py-6">
+                  <div className="w-12 h-12 mx-auto mb-3 bg-emerald-500/10 rounded-full flex items-center justify-center">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-600"><path d="M20 6L9 17l-5-5" /></svg>
+                  </div>
+                  <p className="text-sm font-bold text-emerald-600">ممنون از گزارشت!</p>
+                  <p className="text-[10px] text-muted mt-1">تیم ما بررسی می‌کنه</p>
+                  <button onClick={() => setShowReport(false)} className="mt-4 px-6 py-2 bg-background text-xs font-bold rounded-xl">بستن</button>
+                </div>
+              ) : (
+                <>
+                  {/* Report type */}
+                  <div className="flex gap-1.5 mb-3">
+                    {[
+                      { key: "wrong_info" as const, label: "اطلاعات غلط", icon: "M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 004.99 19z" },
+                      { key: "suggestion" as const, label: "پیشنهاد / تکمیل", icon: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3" },
+                      { key: "experience" as const, label: "تجربه من", icon: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
+                    ].map((t) => (
+                      <button
+                        key={t.key}
+                        onClick={() => setReportType(t.key)}
+                        className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-[10px] font-bold transition-all border ${
+                          reportType === t.key ? "bg-primary/10 border-primary/30 text-primary" : "bg-background border-border text-muted"
+                        }`}
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d={t.icon} /></svg>
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Text input */}
+                  <textarea
+                    value={reportText}
+                    onChange={(e) => setReportText(e.target.value)}
+                    placeholder={
+                      reportType === "wrong_info" ? "کدوم اطلاعات غلطه؟ مثلا: قیمت اشتباهه، مشخصات فنی درست نیست..." :
+                      reportType === "suggestion" ? "چه اطلاعاتی اضافه بشه؟ مثلا: مصرف واقعی سوخت، تجربه سرویس..." :
+                      "تجربه‌ت از این خودرو رو بنویس..."
+                    }
+                    rows={4}
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-xs leading-6 outline-none resize-none focus:border-primary mb-3"
+                  />
+
+                  {/* Submit */}
+                  <button
+                    onClick={async () => {
+                      if (!reportText.trim()) return;
+                      setReportSending(true);
+                      try {
+                        await fetch("/api/report", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            carId: selectedCar.id,
+                            carName: selectedCar.nameFa,
+                            type: reportType,
+                            text: reportText,
+                          }),
+                        });
+                      } catch {}
+                      setReportSending(false);
+                      setReportSent(true);
+                    }}
+                    disabled={reportSending || !reportText.trim()}
+                    className="w-full py-3 bg-primary text-white text-sm font-bold rounded-xl disabled:opacity-40 flex items-center justify-center gap-1.5"
+                  >
+                    {reportSending ? (
+                      <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> ارسال...</>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
+                        ارسال گزارش
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
