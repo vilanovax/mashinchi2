@@ -34,6 +34,17 @@ const SCORE_LABELS: { key: string; label: string }[] = [
   { key: "maintenanceRisk", label: "ریسک نگهداری" }, { key: "afterSales", label: "خدمات" },
 ];
 
+function formatBillion(n: number | string): string {
+  const num = typeof n === "string" ? parseInt(n) : n;
+  if (!num || num <= 0) return "—";
+  if (num >= 1_000_000_000) {
+    const b = num / 1_000_000_000;
+    return toPersianDigits(b.toFixed(1).replace(/\.0$/, "")) + " میلیارد";
+  }
+  if (num >= 1_000_000) return toPersianDigits(Math.round(num / 1_000_000).toString()) + " میلیون";
+  return toPersianDigits(num.toString());
+}
+
 const ORIGIN_COLORS: Record<string, string> = {
   iranian: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
   chinese: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
@@ -50,6 +61,11 @@ export default function CarDetailPage({ params }: { params: Promise<{ id: string
   const [activeTab, setActiveTab] = useState<"overview" | "specs" | "reviews">("overview");
   const [isFavorite, setIsFavorite] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportType, setReportType] = useState<"wrong_info" | "suggestion" | "experience">("wrong_info");
+  const [reportText, setReportText] = useState("");
+  const [reportSending, setReportSending] = useState(false);
+  const [reportSent, setReportSent] = useState(false);
 
   useEffect(() => {
     fetch(`/api/cars/${id}`).then((r) => r.json()).then((data) => {
@@ -118,12 +134,17 @@ export default function CarDetailPage({ params }: { params: Promise<{ id: string
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
           </button>
           <h1 className="text-sm font-black">{car.nameFa}</h1>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
+            <button onClick={() => { setShowReport(true); setReportSent(false); setReportText(""); }} className="p-1.5 text-muted hover:text-orange-500" title="گزارش">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" />
+              </svg>
+            </button>
             <button onClick={handleShare} className="p-1.5 text-muted hover:text-primary">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98" /></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98" /></svg>
             </button>
             <button onClick={toggleFavorite} className="p-1.5">
-              <svg width="18" height="18" viewBox="0 0 24 24"
+              <svg width="16" height="16" viewBox="0 0 24 24"
                 fill={isFavorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2"
                 className={isFavorite ? "text-danger" : "text-muted"}
               ><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" /></svg>
@@ -162,8 +183,10 @@ export default function CarDetailPage({ params }: { params: Promise<{ id: string
               <p className="text-xs text-muted mt-0.5">{car.brandFa} | {car.nameEn}</p>
             </div>
             <div className="text-left">
-              <div className="text-sm font-bold text-primary">{toPersianDigits(formatPrice(car.priceMin))}</div>
-              <div className="text-[10px] text-muted">تا {toPersianDigits(formatPrice(car.priceMax))}</div>
+              <div className="text-sm font-bold text-primary">{formatBillion(car.priceMin)}</div>
+              {car.priceMin !== car.priceMax && parseInt(car.priceMax) > 0 && (
+                <div className="text-[10px] text-muted">تا {formatBillion(car.priceMax)}</div>
+              )}
             </div>
           </div>
 
@@ -279,7 +302,7 @@ export default function CarDetailPage({ params }: { params: Promise<{ id: string
                           <span className="text-[10px] text-muted w-20 shrink-0">{label}</span>
                           <div className="flex-1 h-1.5 bg-border rounded-full overflow-hidden">
                             <div className={`h-full rounded-full ${
-                              key === "maintenanceRisk" ? (score >= 7 ? "bg-danger" : "bg-accent") : (score >= 7 ? "bg-accent" : score >= 4 ? "bg-primary" : "bg-danger")
+                              key === "maintenanceRisk" ? (score >= 7 ? "bg-danger" : score >= 4 ? "bg-orange-500" : "bg-accent") : (score >= 7 ? "bg-accent" : score >= 4 ? "bg-primary" : "bg-danger")
                             }`} style={{ width: `${(score / 10) * 100}%` }} />
                           </div>
                           <span className="text-[10px] font-black w-4 text-center">{toPersianDigits(score)}</span>
@@ -316,13 +339,16 @@ export default function CarDetailPage({ params }: { params: Promise<{ id: string
 
               {/* Warnings */}
               {car.intel && (car.intel.commonIssues.length > 0 || car.intel.purchaseWarnings.length > 0) && (
-                <div className="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800/30 rounded-xl p-4">
-                  <h4 className="text-xs font-black text-yellow-700 dark:text-yellow-400 mb-2">هشدارها</h4>
+                <div className="bg-red-500/5 border border-red-500/15 rounded-xl p-4">
+                  <h4 className="text-xs font-black text-red-600 dark:text-red-400 mb-2 flex items-center gap-1.5">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 004.99 19z" /></svg>
+                    هشدارها
+                  </h4>
                   {car.intel.purchaseWarnings.map((w, i) => (
-                    <div key={`w${i}`} className="flex items-start gap-1.5 text-[11px] text-danger mb-1"><span className="font-bold">!</span><span>{w}</span></div>
+                    <div key={`w${i}`} className="flex items-start gap-1.5 text-[11px] text-red-600 dark:text-red-400 mb-1"><span className="font-black mt-0.5">!</span><span className="leading-5">{w}</span></div>
                   ))}
                   {car.intel.commonIssues.map((issue, i) => (
-                    <div key={`i${i}`} className="flex items-start gap-1.5 text-[11px] text-yellow-700 dark:text-yellow-400 mb-1"><span className="font-bold">!</span><span>{issue}</span></div>
+                    <div key={`i${i}`} className="flex items-start gap-1.5 text-[11px] text-orange-600 dark:text-orange-400 mb-1"><span className="font-black mt-0.5">!</span><span className="leading-5">{issue}</span></div>
                   ))}
                 </div>
               )}
@@ -351,7 +377,7 @@ export default function CarDetailPage({ params }: { params: Promise<{ id: string
                     { label: "مصرف", value: car.specs.fuelConsumption ? `${toPersianDigits(car.specs.fuelConsumption)} لیتر/۱۰۰کم` : null },
                     { label: "شتاب ۰-۱۰۰", value: car.specs.acceleration ? `${toPersianDigits(car.specs.acceleration)} ثانیه` : null },
                     { label: "ظرفیت", value: `${toPersianDigits(car.specs.seatingCapacity)} نفر` },
-                    { label: "قیمت شروع", value: toPersianDigits(formatPrice(car.priceMin)), highlight: true },
+                    { label: "قیمت شروع", value: formatBillion(car.priceMin), highlight: true },
                   ].filter((row) => row.value).map((row, i) => (
                     <div key={i} className={`flex items-center justify-between px-4 py-3 ${i % 2 === 0 ? "bg-background/30" : ""}`}>
                       <span className="text-xs text-muted">{row.label}</span>
@@ -432,6 +458,60 @@ export default function CarDetailPage({ params }: { params: Promise<{ id: string
           )}
         </div>
       </div>
+
+      {/* Report Modal */}
+      {showReport && car && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-50" onClick={() => !reportSending && setShowReport(false)} />
+          <div className="fixed bottom-0 left-0 right-0 bg-surface rounded-t-2xl z-50 shadow-2xl max-h-[65vh] overflow-y-auto safe-bottom">
+            <div className="w-10 h-1 bg-border rounded-full mx-auto mt-2 mb-3" />
+            <div className="px-5 pb-6">
+              <h3 className="text-sm font-black mb-1">گزارش درباره {car.nameFa}</h3>
+              <p className="text-[10px] text-muted mb-3">کمک کن اطلاعات رو بهتر کنیم</p>
+
+              {reportSent ? (
+                <div className="text-center py-6">
+                  <div className="w-12 h-12 mx-auto mb-2 bg-emerald-500/10 rounded-full flex items-center justify-center">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-600"><path d="M20 6L9 17l-5-5" /></svg>
+                  </div>
+                  <p className="text-sm font-bold text-emerald-600">ممنون!</p>
+                  <p className="text-[10px] text-muted mt-0.5">تیم ما بررسی می‌کنه</p>
+                  <button onClick={() => setShowReport(false)} className="mt-3 px-5 py-1.5 bg-background text-xs font-bold rounded-xl">بستن</button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-1.5 mb-3">
+                    {[
+                      { key: "wrong_info" as const, label: "اطلاعات غلط" },
+                      { key: "suggestion" as const, label: "پیشنهاد" },
+                      { key: "experience" as const, label: "تجربه من" },
+                    ].map((t) => (
+                      <button key={t.key} onClick={() => setReportType(t.key)}
+                        className={`flex-1 py-2 rounded-xl text-[10px] font-bold border transition-all ${
+                          reportType === t.key ? "bg-primary/10 border-primary/30 text-primary" : "bg-background border-border text-muted"
+                        }`}>{t.label}</button>
+                    ))}
+                  </div>
+                  <textarea value={reportText} onChange={(e) => setReportText(e.target.value)}
+                    placeholder={reportType === "wrong_info" ? "کدوم اطلاعات غلطه؟" : reportType === "suggestion" ? "چه اطلاعاتی اضافه بشه؟" : "تجربه‌ت رو بنویس..."}
+                    rows={3} className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs leading-6 outline-none resize-none focus:border-primary mb-3" />
+                  <button
+                    onClick={async () => {
+                      if (!reportText.trim()) return;
+                      setReportSending(true);
+                      try { await fetch("/api/report", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ carId: car.id, carName: car.nameFa, type: reportType, text: reportText }) }); } catch {}
+                      setReportSending(false);
+                      setReportSent(true);
+                    }}
+                    disabled={reportSending || !reportText.trim()}
+                    className="w-full py-2.5 bg-primary text-white text-sm font-bold rounded-xl disabled:opacity-40"
+                  >{reportSending ? "ارسال..." : "ارسال گزارش"}</button>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Share toast */}
       {showShare && (
