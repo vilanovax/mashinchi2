@@ -332,6 +332,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [notifs, setNotifs] = useState<{ id: string; type: string; title: string; message: string; entityId: string | null; isRead: boolean; createdAt: string }[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -539,20 +541,105 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </div>
               </div>
 
-              {/* Notification bell */}
-              <button
-                onClick={() => router.push("/admin/audit")}
-                className="p-1.5 rounded-lg text-muted hover:text-foreground hover:bg-surface transition-colors relative"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
-                </svg>
-                {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-danger text-white text-[8px] font-bold rounded-full flex items-center justify-center">
-                    {unreadCount > 9 ? "+" : unreadCount}
-                  </span>
+              {/* Notification bell + dropdown */}
+              <div className="relative">
+                <button
+                  onClick={async () => {
+                    if (!showNotifs) {
+                      const res = await fetchAdmin("/api/admin/notifications");
+                      const data = await res.json();
+                      setNotifs(Array.isArray(data) ? data.slice(0, 15) : []);
+                    }
+                    setShowNotifs(!showNotifs);
+                  }}
+                  className="p-1.5 rounded-lg text-muted hover:text-foreground hover:bg-surface transition-colors relative"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
+                  </svg>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-danger text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                      {unreadCount > 9 ? "+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Dropdown panel */}
+                {showNotifs && (
+                  <>
+                    <div className="fixed inset-0 z-20" onClick={() => setShowNotifs(false)} />
+                    <div className="absolute left-0 top-full mt-1 w-80 bg-surface border border-border rounded-xl shadow-2xl z-30 overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+                        <span className="text-[11px] font-black">اعلان‌ها</span>
+                        {notifs.some((n) => !n.isRead) && (
+                          <button
+                            onClick={async () => {
+                              await fetchAdmin("/api/admin/notifications", {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ ids: "all" }),
+                              });
+                              setNotifs((prev) => prev.map((n) => ({ ...n, isRead: true })));
+                              setUnreadCount(0);
+                            }}
+                            className="text-[9px] text-primary font-bold"
+                          >
+                            همه خوانده شد
+                          </button>
+                        )}
+                      </div>
+                      <div className="max-h-[350px] overflow-y-auto divide-y divide-border/30">
+                        {notifs.length === 0 ? (
+                          <div className="py-6 text-center text-[10px] text-muted">اعلانی نیست</div>
+                        ) : (
+                          notifs.map((n) => {
+                            const isReport = n.type === "user_report";
+                            const time = new Date(n.createdAt);
+                            return (
+                              <div
+                                key={n.id}
+                                className={`px-3 py-2 hover:bg-background/50 cursor-pointer ${!n.isRead ? "bg-primary/3" : ""}`}
+                                onClick={() => {
+                                  if (isReport && n.entityId) {
+                                    router.push(`/admin/cars/${n.entityId}`);
+                                    setShowNotifs(false);
+                                  }
+                                }}
+                              >
+                                <div className="flex items-start gap-2">
+                                  <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${
+                                    isReport ? "bg-orange-500" :
+                                    n.type === "price_change" ? "bg-primary" : "bg-muted/40"
+                                  }`} />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[10px] font-bold truncate">{n.title}</span>
+                                      {isReport && <span className="text-[8px] bg-orange-500/15 text-orange-600 px-1 py-0.5 rounded font-bold shrink-0">گزارش</span>}
+                                    </div>
+                                    <p className="text-[9px] text-muted line-clamp-2 mt-0.5 leading-4">{n.message}</p>
+                                    <span className="text-[8px] text-muted/50">{time.toLocaleDateString("fa-IR")} {time.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" })}</span>
+                                  </div>
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      await fetchAdmin(`/api/admin/notifications?id=${n.id}`, { method: "DELETE" });
+                                      setNotifs((prev) => prev.filter((x) => x.id !== n.id));
+                                      if (!n.isRead) setUnreadCount((c) => Math.max(0, c - 1));
+                                    }}
+                                    className="text-muted/30 hover:text-red-500 shrink-0 p-0.5"
+                                  >
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </>
                 )}
-              </button>
+              </div>
             </div>
           </div>
           {children}

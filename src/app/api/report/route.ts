@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// POST - user submits a report about a car (wrong info, suggestion, experience)
+// POST - user submits a report about a car
 export async function POST(request: NextRequest) {
   try {
     const { carId, carName, type, text } = await request.json();
@@ -10,13 +10,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "carId and text required" }, { status: 400 });
     }
 
-    // Store as a notification for admins to review
+    const typeLabel = type === "wrong_info" ? "اطلاعات غلط" : type === "suggestion" ? "پیشنهاد" : "تجربه کاربر";
+
     await prisma.notification.create({
       data: {
         type: "user_report",
-        title: `گزارش کاربر: ${carName || "خودرو"}`,
-        message: `[${type === "wrong_info" ? "اطلاعات غلط" : type === "suggestion" ? "پیشنهاد" : "تجربه"}] ${text.slice(0, 500)}`,
-        data: JSON.stringify({ carId, carName, reportType: type, text }),
+        title: `گزارش: ${carName || "خودرو"} (${typeLabel})`,
+        message: text.slice(0, 500),
+        entityId: carId,
       },
     });
 

@@ -34,3 +34,16 @@ export async function PUT(request: NextRequest) {
 
   return NextResponse.json({ success: true });
 }
+
+// Delete notification
+export async function DELETE(request: NextRequest) {
+  const session = await verifyAdmin(request);
+  if (!session) return unauthorizedResponse();
+
+  const id = request.nextUrl.searchParams.get("id");
+  if (id) {
+    await prisma.notification.delete({ where: { id } });
+  }
+
+  return NextResponse.json({ success: true });
+}
