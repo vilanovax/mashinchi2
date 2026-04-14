@@ -38,7 +38,7 @@ export async function PUT(
     await prisma.carScores.upsert({
       where: { carId: id },
       update: body.scores,
-      create: { carId: id, ...body.scores },
+      create: { ...body.scores, car: { connect: { id } } },
     });
   }
 
@@ -47,7 +47,7 @@ export async function PUT(
     await prisma.carSpecs.upsert({
       where: { carId: id },
       update: body.specs,
-      create: { carId: id, ...body.specs },
+      create: { ...body.specs, car: { connect: { id } } },
     });
   }
 
@@ -56,7 +56,7 @@ export async function PUT(
     await prisma.carIntelligence.upsert({
       where: { carId: id },
       update: body.intel,
-      create: { carId: id, ...body.intel },
+      create: { ...body.intel, car: { connect: { id } } },
     });
   }
 
