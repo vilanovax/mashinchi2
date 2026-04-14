@@ -247,5 +247,6 @@ export async function GET() {
     userTypes: dominantTypes.map((t) => t.label),
     tasteProfile: profile,
     totalInteractions: user.interactions.length,
+    budget: user.budget ? user.budget.toString() : null,
   });
 }

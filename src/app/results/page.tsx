@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toPersianDigits, getOriginLabel, getCategoryLabel } from "@/lib/utils";
 import BottomSheet from "@/components/BottomSheet";
+import { saveSnapshot } from "@/lib/recommendHistory";
 
 function formatBillion(n: number | string): string {
   const num = typeof n === "string" ? parseInt(n) : n;
@@ -137,6 +138,17 @@ export default function ResultsPage() {
         if (data.alternatives) setAlternatives(data.alternatives);
         if (data.userTypes) setUserTypes(data.userTypes);
         setLoading(false);
+
+        // Save snapshot to history (last 3)
+        if (data.recommendations && data.recommendations.length > 0) {
+          saveSnapshot({
+            budget: data.budget || null,
+            cars: data.recommendations.slice(0, 5).map((r: { id: string; nameFa: string; brandFa: string; priceMin: string; priceMax: string; matchScore: number }) => ({
+              id: r.id, nameFa: r.nameFa, brandFa: r.brandFa,
+              priceMin: r.priceMin, priceMax: r.priceMax, matchScore: r.matchScore,
+            })),
+          });
+        }
       })
       .catch(() => setLoading(false));
 

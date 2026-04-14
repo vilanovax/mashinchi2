@@ -6,6 +6,7 @@ import { formatPrice, toPersianDigits, getOriginLabel, getCategoryLabel } from "
 import { useTheme } from "@/components/ThemeProvider";
 import BottomSheet from "@/components/BottomSheet";
 import { useCompare } from "@/lib/useCompare";
+import { getHistory, removeSnapshot, type HistoryEntry } from "@/lib/recommendHistory";
 
 interface FavoriteCar {
   id: string;
@@ -84,6 +85,38 @@ export default function ProfilePage() {
   const [myCarSaving, setMyCarSaving] = useState(false);
   const [myCarSaved, setMyCarSaved] = useState(false);
   const [allCars, setAllCars] = useState<{ id: string; nameFa: string; brandFa: string }[]>([]);
+
+  // Recommend history
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  useEffect(() => {
+    setHistory(getHistory());
+  }, []);
+
+  const handleRemoveHistory = (id: string) => {
+    removeSnapshot(id);
+    setHistory(getHistory());
+  };
+
+  const formatBillion = (n: string): string => {
+    const num = parseInt(n);
+    if (!num) return "—";
+    if (num >= 1_000_000_000) return toPersianDigits((num / 1_000_000_000).toFixed(1).replace(/\.0$/, "")) + " م";
+    if (num >= 1_000_000) return toPersianDigits(Math.round(num / 1_000_000).toString()) + " م";
+    return toPersianDigits(num.toString());
+  };
+
+  const relativeTime = (iso: string): string => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return "همین الان";
+    if (min < 60) return `${toPersianDigits(min)} دقیقه پیش`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${toPersianDigits(hr)} ساعت پیش`;
+    const day = Math.floor(hr / 24);
+    if (day < 30) return `${toPersianDigits(day)} روز پیش`;
+    return new Date(iso).toLocaleDateString("fa-IR");
+  };
   const { toggleCompare, isInCompare, canCompare, goToCompare, count: compareCount, clearCompare } = useCompare();
 
   useEffect(() => {
@@ -531,6 +564,63 @@ export default function ProfilePage() {
                 <path d="M20 6L9 17l-5-5" />
               </svg>
               {toast}
+            </div>
+          </div>
+        )}
+
+        {/* ─── Recommendation History ─── */}
+        {history.length > 0 && (
+          <div className="px-5 mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-black flex items-center gap-1.5">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
+                  <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
+                </svg>
+                پیشنهادهای قبلی ({toPersianDigits(history.length)})
+              </h2>
+            </div>
+            <div className="space-y-1.5">
+              {history.map((h) => (
+                <div key={h.id} className="bg-surface rounded-xl border border-border overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-border/40">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold">{relativeTime(h.date)}</span>
+                      {h.budget && (
+                        <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">
+                          بودجه {formatBillion(h.budget)}
+                        </span>
+                      )}
+                      <span className="text-[9px] text-muted">{toPersianDigits(h.cars.length)} پیشنهاد</span>
+                    </div>
+                    <button
+                      onClick={() => handleRemoveHistory(h.id)}
+                      className="text-muted/40 hover:text-red-500 p-0.5"
+                      title="حذف"
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                  <div className="px-3 py-2">
+                    <div className="flex flex-wrap gap-1.5">
+                      {h.cars.slice(0, 5).map((car, i) => (
+                        <button
+                          key={car.id}
+                          onClick={() => router.push(`/car/${car.id}`)}
+                          className="flex items-center gap-1 bg-background hover:bg-primary/5 rounded-lg px-2 py-1 text-[10px] transition-colors"
+                        >
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black shrink-0 ${
+                            i === 0 ? "bg-primary text-white" : "bg-border text-muted"
+                          }`}>
+                            {toPersianDigits(i + 1)}
+                          </span>
+                          <span className="font-bold">{car.nameFa}</span>
+                          <span className="text-primary font-bold">· {formatBillion(car.priceMin)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
