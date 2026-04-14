@@ -33,6 +33,20 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/icon-192.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icon-192.svg" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebApplication",
+            name: "ماشینچی",
+            description: "دستیار هوشمند خرید خودرو در بازار ایران",
+            url: "https://mashinchi.ir",
+            applicationCategory: "LifestyleApplication",
+            operatingSystem: "Web",
+            inLanguage: "fa",
+            offers: { "@type": "Offer", price: "0", priceCurrency: "IRR" },
+          }) }}
+        />
         <link
           href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css"
           rel="stylesheet"
