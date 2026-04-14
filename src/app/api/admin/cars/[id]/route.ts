@@ -42,12 +42,16 @@ export async function PUT(
     });
   }
 
-  // Update specs
+  // Update specs — strip null required fields
   if (body.specs) {
+    const specsClean: Record<string, unknown> = { ...body.specs };
+    // seatingCapacity has default 5, can't be null
+    if (specsClean.seatingCapacity == null) delete specsClean.seatingCapacity;
+
     await prisma.carSpecs.upsert({
       where: { carId: id },
-      update: body.specs,
-      create: { ...body.specs, car: { connect: { id } } },
+      update: specsClean,
+      create: { ...specsClean, car: { connect: { id } } },
     });
   }
 
