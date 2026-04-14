@@ -35,24 +35,32 @@ async function getPriceTable(sp: URLSearchParams) {
   const now = new Date();
   const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const carIds = cars.map((c) => c.id);
 
-  const result = await Promise.all(cars.map(async (car) => {
+  // Batch: get all week-ago and month-ago prices in 2 queries (not N*2)
+  const [weekPrices, monthPrices] = await Promise.all([
+    prisma.priceHistory.findMany({
+      where: { carId: { in: carIds }, date: { lte: oneWeekAgo } },
+      orderBy: { date: "desc" },
+      distinct: ["carId"],
+      select: { carId: true, price: true },
+    }),
+    prisma.priceHistory.findMany({
+      where: { carId: { in: carIds }, date: { lte: oneMonthAgo } },
+      orderBy: { date: "desc" },
+      distinct: ["carId"],
+      select: { carId: true, price: true },
+    }),
+  ]);
+
+  const weekMap = new Map(weekPrices.map((p) => [p.carId, Number(p.price)]));
+  const monthMap = new Map(monthPrices.map((p) => [p.carId, Number(p.price)]));
+
+  const result = cars.map((car) => {
     const latestPrice = car.prices[0];
-    const prevPrice = car.prices[1];
-
-    // Get week-ago and month-ago prices
-    const weekPrice = await prisma.priceHistory.findFirst({
-      where: { carId: car.id, date: { lte: oneWeekAgo } },
-      orderBy: { date: "desc" },
-    });
-    const monthPrice = await prisma.priceHistory.findFirst({
-      where: { carId: car.id, date: { lte: oneMonthAgo } },
-      orderBy: { date: "desc" },
-    });
-
     const current = latestPrice ? Number(latestPrice.price) : Number(car.priceMin);
-    const weekChange = weekPrice ? calcChange(current, Number(weekPrice.price)) : null;
-    const monthChange = monthPrice ? calcChange(current, Number(monthPrice.price)) : null;
+    const weekVal = weekMap.get(car.id);
+    const monthVal = monthMap.get(car.id);
 
     return {
       id: car.id,
@@ -66,11 +74,11 @@ async function getPriceTable(sp: URLSearchParams) {
       price: current.toString(),
       priceMin: car.priceMin.toString(),
       priceMax: car.priceMax.toString(),
-      weekChange,
-      monthChange,
+      weekChange: weekVal ? calcChange(current, weekVal) : null,
+      monthChange: monthVal ? calcChange(current, monthVal) : null,
       lastUpdate: latestPrice?.date?.toISOString() || null,
     };
-  }));
+  });
 
   // Sort
   if (sort === "price") result.sort((a, b) => Number(a.price) - Number(b.price));

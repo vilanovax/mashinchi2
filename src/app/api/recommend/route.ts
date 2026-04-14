@@ -41,8 +41,18 @@ export async function GET() {
     .filter((i) => i.action === "like")
     .map((i) => i.carId);
 
-  // Get all cars with full data
+  // Filter candidates by budget (±20%) at DB level
+  const budgetNum = user.budget ? Number(user.budget) : 0;
+  const budgetWhere = budgetNum > 0
+    ? {
+        priceMin: { lte: BigInt(Math.floor(budgetNum * 1.2)) },
+        priceMax: { gte: BigInt(Math.floor(budgetNum * 0.8)) },
+      }
+    : {};
+
+  // Get only budget-matched cars with needed fields
   const allCars = await prisma.car.findMany({
+    where: budgetWhere,
     include: {
       scores: true,
       specs: true,
@@ -68,23 +78,8 @@ export async function GET() {
   typeScores.sort((a, b) => b.score - a.score);
   const dominantTypes = typeScores.filter((t) => t.score > 0).slice(0, 3);
 
-  // Filter candidates by budget (±20%)
-  const budgetFilter = user.budget
-    ? {
-        min: BigInt(Math.floor(Number(user.budget) * 0.8)),
-        max: BigInt(Math.floor(Number(user.budget) * 1.2)),
-      }
-    : null;
-
-  // Score each car
-  const scored = allCars
-    .filter((car) => {
-      if (budgetFilter) {
-        return car.priceMin <= budgetFilter.max && car.priceMax >= budgetFilter.min;
-      }
-      return true;
-    })
-    .map((car) => {
+  // Score each car (already budget-filtered from DB)
+  const scored = allCars.map((car) => {
       let matchScore = 0;
       const matchReasons: string[] = [];
       const risks: string[] = [];

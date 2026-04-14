@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { formatPrice, toPersianDigits, getOriginLabel, getCategoryLabel } from "@/lib/utils";
 
 interface PricePoint { date: string; price: string; source: string }
@@ -159,7 +160,7 @@ export default function CarDetailPage({ params }: { params: Promise<{ id: string
           {/* Image or placeholder */}
           <div className="h-44 bg-gradient-to-br from-primary/8 via-primary/4 to-accent/6 rounded-2xl flex items-center justify-center relative mb-4 overflow-hidden">
             {car.imageUrl ? (
-              <img src={car.imageUrl} alt={car.nameFa} className="w-full h-full object-cover" />
+              <Image src={car.imageUrl} alt={car.nameFa} fill className="object-cover" sizes="(max-width: 768px) 100vw, 500px" priority />
             ) : (
               <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-primary/20">
                 <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M5 17H3v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2" /><path d="M9 17h6" />
