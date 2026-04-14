@@ -321,7 +321,7 @@ ${sourceBlocks}
     // Mark all contributing sources as approved
     await prisma.carSource.updateMany({
       where: { id: { in: sourceIds } },
-      data: { status: "approved", appliedAt: new Date() },
+      data: { status: "merged", appliedAt: new Date() },
     });
 
     await logAction("update", "car", car.id, {

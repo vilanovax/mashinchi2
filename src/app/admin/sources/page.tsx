@@ -21,6 +21,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   pending: { label: "در انتظار", color: "text-amber-600", bg: "bg-amber-500/10" },
   processed: { label: "پردازش‌شده", color: "text-primary", bg: "bg-primary/10" },
   approved: { label: "تایید‌شده", color: "text-accent", bg: "bg-accent/10" },
+  merged: { label: "ادغام‌شده", color: "text-violet-600", bg: "bg-violet-500/10" },
   rejected: { label: "رد‌شده", color: "text-danger", bg: "bg-danger/10" },
   archived: { label: "آرشیو", color: "text-muted", bg: "bg-muted/10" },
 };
@@ -389,6 +390,7 @@ export default function AdminSourcesPage() {
     pending: sources.filter((s) => s.status === "pending").length,
     processed: sources.filter((s) => s.status === "processed").length,
     approved: sources.filter((s) => s.status === "approved").length,
+    merged: sources.filter((s) => s.status === "merged").length,
     archived: sources.filter((s) => s.status === "archived").length,
   }), [sources]);
 
@@ -724,7 +726,7 @@ export default function AdminSourcesPage() {
       {/* Filters */}
       <div className="flex items-center gap-3 mb-4">
         <div className="flex gap-1.5">
-          {Object.entries({ all: { label: "همه", count: stats.total }, pending: { label: "انتظار", count: stats.pending }, processed: { label: "پردازش‌شده", count: stats.processed }, approved: { label: "تایید", count: stats.approved }, archived: { label: "آرشیو", count: stats.archived } }).map(([key, val]) => (
+          {Object.entries({ all: { label: "همه", count: stats.total }, pending: { label: "انتظار", count: stats.pending }, processed: { label: "پردازش‌شده", count: stats.processed }, approved: { label: "تایید", count: stats.approved }, merged: { label: "ادغام‌شده", count: stats.merged }, archived: { label: "آرشیو", count: stats.archived } }).map(([key, val]) => (
             <button
               key={key}
               onClick={() => setFilterStatus(key)}
@@ -754,9 +756,15 @@ export default function AdminSourcesPage() {
           const isSelected = selectedIds.has(src.id);
           const canSelect = src.status === "processed" || src.status === "approved";
 
+          // Determine if this source is "locked" — a different car is already in selection
+          const firstSelected = selectedIds.size > 0 ? sources.find((s) => selectedIds.has(s.id)) : null;
+          const isLockedByOtherCar = firstSelected != null && firstSelected.carId !== src.carId && !isSelected;
+
           return (
-            <div key={src.id} className={`bg-surface rounded-xl border overflow-hidden transition-colors ${
+            <div key={src.id} className={`bg-surface rounded-xl border overflow-hidden transition-all ${
               isSelected ? "border-primary ring-1 ring-primary/30" :
+              isLockedByOtherCar ? "border-border/40 opacity-40" :
+              src.status === "merged" ? "border-violet-500/20" :
               src.status === "approved" ? "border-accent/20" : "border-border"
             }`}>
               {/* Row */}
@@ -764,10 +772,14 @@ export default function AdminSourcesPage() {
                 {/* Selection checkbox (only for processed/approved) */}
                 <button
                   onClick={(e) => { e.stopPropagation(); toggleSelect(src); }}
-                  disabled={!canSelect}
-                  title={canSelect ? "انتخاب برای ترکیب" : "ابتدا منبع را پردازش کنید"}
+                  disabled={!canSelect || isLockedByOtherCar}
+                  title={
+                    isLockedByOtherCar ? `فقط منابع ${firstSelected.carName} قابل ترکیب هستند` :
+                    canSelect ? "انتخاب برای ترکیب" : "ابتدا منبع را پردازش کنید"
+                  }
                   className={`w-4 h-4 shrink-0 rounded border-2 flex items-center justify-center transition-all ${
                     isSelected ? "bg-primary border-primary" :
+                    isLockedByOtherCar ? "border-border/20 cursor-not-allowed" :
                     canSelect ? "border-border hover:border-primary" : "border-border/30 opacity-30 cursor-not-allowed"
                   }`}
                 >
@@ -1183,13 +1195,18 @@ export default function AdminSourcesPage() {
       )}
 
       {/* ─── Merge Floating Bar ─── */}
-      {selectedIds.size > 0 && !mergePreview && (
+      {selectedIds.size > 0 && !mergePreview && (() => {
+        const selectedCarName = sources.find((s) => selectedIds.has(s.id))?.carName || "";
+        return (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-foreground text-background rounded-2xl shadow-2xl z-40 flex items-center gap-3 pr-4 pl-2 py-2 animate-in fade-in slide-in-from-bottom-2">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-xs font-black text-white">{toPersianDigits(selectedIds.size)}</span>
             </div>
-            <span className="text-[11px] font-bold">منبع انتخاب‌شده برای ترکیب</span>
+            <div className="flex flex-col leading-tight">
+              <span className="text-[11px] font-bold">منبع برای ترکیب</span>
+              {selectedCarName && <span className="text-[9px] text-background/60">{selectedCarName}</span>}
+            </div>
           </div>
           <div className="h-6 w-px bg-background/20" />
           <button
@@ -1221,7 +1238,8 @@ export default function AdminSourcesPage() {
             </svg>
           </button>
         </div>
-      )}
+        );
+      })()}
 
       {/* ─── Merge Preview Modal ─── */}
       {mergePreview && (() => {
