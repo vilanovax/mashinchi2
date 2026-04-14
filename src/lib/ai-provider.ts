@@ -63,31 +63,56 @@ export async function callAI(
   return callClaude(prompt, maxTokens, config);
 }
 
+// Friendly error formatter for network/API failures
+function wrapAIError(e: unknown, provider: string): Error {
+  const err = e as { message?: string; cause?: { code?: string; message?: string } };
+  const msg = err?.message || "";
+  const causeCode = err?.cause?.code;
+
+  if (msg.includes("Connection error") || msg.includes("fetch failed") || causeCode === "EBADF" || causeCode === "ECONNREFUSED") {
+    return new Error(`اتصال به ${provider} برقرار نشد. فیلترشکن/VPN رو چک کن یا بعدا تلاش کن.`);
+  }
+  if (msg.includes("401") || msg.includes("Unauthorized") || msg.includes("invalid api key")) {
+    return new Error(`کلید API ${provider} نامعتبر است. از تنظیمات ادمین بررسی کن.`);
+  }
+  if (msg.includes("429") || msg.includes("rate limit")) {
+    return new Error(`محدودیت نرخ ${provider}. چند دقیقه صبر کن و دوباره تلاش کن.`);
+  }
+  if (msg.includes("timeout") || msg.includes("ETIMEDOUT")) {
+    return new Error(`پاسخ ${provider} طولانی شد. دوباره تلاش کن.`);
+  }
+  return new Error(`خطای ${provider}: ${msg.slice(0, 200)}`);
+}
+
 async function callClaude(prompt: string, maxTokens: number, config: AIConfig): Promise<string> {
   if (!config.claudeApiKey) throw new Error("کلید Anthropic تنظیم نشده. از تنظیمات ادمین وارد کنید.");
 
-  const anthropic = new Anthropic({ apiKey: config.claudeApiKey });
-
-  const message = await anthropic.messages.create({
-    model: config.claudeModel || "claude-sonnet-4-20250514",
-    max_tokens: maxTokens,
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const textBlock = message.content.find((b) => b.type === "text");
-  return textBlock?.text || "";
+  try {
+    const anthropic = new Anthropic({ apiKey: config.claudeApiKey });
+    const message = await anthropic.messages.create({
+      model: config.claudeModel || "claude-sonnet-4-20250514",
+      max_tokens: maxTokens,
+      messages: [{ role: "user", content: prompt }],
+    });
+    const textBlock = message.content.find((b) => b.type === "text");
+    return textBlock?.text || "";
+  } catch (e) {
+    throw wrapAIError(e, "Claude");
+  }
 }
 
 async function callOpenAI(prompt: string, maxTokens: number, config: AIConfig): Promise<string> {
   if (!config.openaiApiKey) throw new Error("کلید OpenAI تنظیم نشده. از تنظیمات ادمین وارد کنید.");
 
-  const openai = new OpenAI({ apiKey: config.openaiApiKey });
-
-  const response = await openai.chat.completions.create({
-    model: config.openaiModel || "gpt-4o",
-    max_tokens: maxTokens,
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  return response.choices[0]?.message?.content || "";
+  try {
+    const openai = new OpenAI({ apiKey: config.openaiApiKey });
+    const response = await openai.chat.completions.create({
+      model: config.openaiModel || "gpt-4o",
+      max_tokens: maxTokens,
+      messages: [{ role: "user", content: prompt }],
+    });
+    return response.choices[0]?.message?.content || "";
+  } catch (e) {
+    throw wrapAIError(e, "OpenAI");
+  }
 }
