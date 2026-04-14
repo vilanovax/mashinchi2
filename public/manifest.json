@@ -1,7 +1,7 @@
 {
   "name": "ماشینچی - دستیار خرید خودرو",
   "short_name": "ماشینچی",
-  "description": "دستیار هوشمند خرید خودرو در بازار ایران",
+  "description": "دستیار هوشمند خرید خودرو در بازار ایران — بررسی، مقایسه و قیمت روز ۱۳۷ خودرو",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f8fafc",
@@ -9,11 +9,35 @@
   "orientation": "portrait",
   "dir": "rtl",
   "lang": "fa",
-  "categories": ["auto", "shopping"],
+  "categories": ["auto", "shopping", "lifestyle"],
   "icons": [
     { "src": "/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any maskable" },
     { "src": "/icon-512.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any maskable" }
   ],
+  "shortcuts": [
+    {
+      "name": "کاتالوگ خودرو",
+      "short_name": "کاتالوگ",
+      "description": "مشاهده لیست کامل خودروها",
+      "url": "/catalog",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "قیمت روز بازار",
+      "short_name": "قیمت‌ها",
+      "description": "قیمت روز خودروها",
+      "url": "/market",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "نشان‌شده‌های من",
+      "short_name": "علاقه‌مندی‌ها",
+      "description": "خودروهای نشان‌شده",
+      "url": "/profile",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml" }]
+    }
+  ],
   "screenshots": [],
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
+  "display_override": ["standalone", "minimal-ui"]
 }

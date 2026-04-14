@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ThemeProvider from "@/components/ThemeProvider";
 import BottomNav from "@/components/BottomNav";
+import PWAPrompt from "@/components/PWAPrompt";
 
 export const metadata: Metadata = {
   title: "ماشینچی | دستیار هوشمند خرید خودرو",
@@ -82,6 +83,7 @@ export default function RootLayout({
         <ThemeProvider>
           {children}
           <BottomNav />
+          <PWAPrompt />
         </ThemeProvider>
       </body>
     </html>
