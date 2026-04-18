@@ -96,6 +96,21 @@ const CATEGORIES = [
   { key: "pickup", label: "وانت" },
 ];
 
+const TRANSMISSIONS = [
+  { key: "all", label: "همه" },
+  { key: "automatic", label: "اتوماتیک" },
+  { key: "manual", label: "دنده‌ای" },
+  { key: "CVT", label: "CVT" },
+];
+
+const PRICE_PRESETS = [
+  { label: "همه", min: 0, max: Infinity },
+  { label: "زیر ۱ میلیارد", min: 0, max: 1_000_000_000 },
+  { label: "۱ تا ۲ میلیارد", min: 1_000_000_000, max: 2_000_000_000 },
+  { label: "۲ تا ۵ میلیارد", min: 2_000_000_000, max: 5_000_000_000 },
+  { label: "بالای ۵ میلیارد", min: 5_000_000_000, max: Infinity },
+];
+
 const SORT_OPTIONS = [
   { key: "price-asc", label: "ارزان‌ترین" },
   { key: "price-desc", label: "گران‌ترین" },
@@ -109,6 +124,8 @@ export default function CatalogPage() {
   const [originFilter, setOriginFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [conditionFilter, setConditionFilter] = useState("all");
+  const [transmissionFilter, setTransmissionFilter] = useState("all");
+  const [pricePreset, setPricePreset] = useState(0); // index into PRICE_PRESETS
   const [sortBy, setSortBy] = useState("price-asc");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedCar, setSelectedCar] = useState<CarDetail | null>(null);
@@ -116,6 +133,7 @@ export default function CatalogPage() {
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [compareMode, setCompareMode] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [showFilters, setShowFilters] = useState(false);
 
   // Report modal
   const [showReport, setShowReport] = useState(false);
@@ -183,6 +201,23 @@ export default function CatalogPage() {
       result = result.filter((c) => !c.isNew);
     }
 
+    // Transmission
+    if (transmissionFilter !== "all") {
+      result = result.filter((c) => c.specs?.transmission === transmissionFilter);
+    }
+
+    // Price range
+    const preset = PRICE_PRESETS[pricePreset];
+    if (preset && (preset.min !== 0 || preset.max !== Infinity)) {
+      result = result.filter((c) => {
+        const min = parseInt(c.priceMin) || 0;
+        const max = parseInt(c.priceMax) || 0;
+        const price = max > 0 ? max : min;
+        if (price === 0) return false;
+        return price >= preset.min && price <= preset.max;
+      });
+    }
+
     // Sort
     if (sortBy === "price-asc") {
       result.sort((a, b) => (parseInt(a.priceMin) || Number.MAX_SAFE_INTEGER) - (parseInt(b.priceMin) || Number.MAX_SAFE_INTEGER));
@@ -193,7 +228,7 @@ export default function CatalogPage() {
     }
 
     return result;
-  }, [cars, search, originFilter, categoryFilter, conditionFilter, sortBy]);
+  }, [cars, search, originFilter, categoryFilter, conditionFilter, transmissionFilter, pricePreset, sortBy]);
 
   const openCarDetail = async (carId: string) => {
     setSheetOpen(true);
@@ -232,123 +267,90 @@ export default function CatalogPage() {
     );
   }
 
-  // Get top traits for a car
-  const getTopTraits = (car: Car): string[] => {
-    if (!car.scores) return [];
-    const traits: { label: string; value: number }[] = [
-      { label: "راحت", value: car.scores.comfort || 0 },
-      { label: "قدرتمند", value: car.scores.performance || 0 },
-      { label: "اقتصادی", value: car.scores.economy || 0 },
-      { label: "امن", value: car.scores.safety || 0 },
-      { label: "باکلاس", value: car.scores.prestige || 0 },
-      { label: "خانوادگی", value: car.scores.familyFriendly || 0 },
-    ];
-    return traits.sort((a, b) => b.value - a.value).slice(0, 2).map((t) => t.label);
-  };
-
-  const activeFilterCount = (originFilter !== "all" ? 1 : 0) + (categoryFilter !== "all" ? 1 : 0) + (conditionFilter !== "all" ? 1 : 0);
+  const activeFilterCount = (originFilter !== "all" ? 1 : 0) + (categoryFilter !== "all" ? 1 : 0) + (conditionFilter !== "all" ? 1 : 0) + (transmissionFilter !== "all" ? 1 : 0) + (pricePreset !== 0 ? 1 : 0);
 
   const setView = (mode: "list" | "grid") => {
     setViewMode(mode);
     try { localStorage.setItem("mashinchi-view-mode", mode); } catch {}
   };
 
+  const getTransmissionLabel = (t: string) => {
+    if (t === "automatic") return "اتوماتیک";
+    if (t === "manual") return "دنده‌ای";
+    return t;
+  };
+
   return (
     <div className="flex-1 flex flex-col page-transition">
-      {/* Header */}
-      <div className="px-4 pt-3 pb-1">
-        <div className="flex items-center justify-between mb-2">
-          <h1 className="text-base font-black">کاتالوگ خودرو</h1>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-muted">{toPersianDigits(filtered.length)} خودرو</span>
-            <div className="flex bg-background rounded-lg p-0.5">
-              <button onClick={() => setView("list")} className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-surface shadow-sm text-foreground" : "text-muted"}`}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
+      {/* ─── Sticky Header ─── */}
+      <div className="px-4 pt-3 pb-2 border-b border-border bg-surface/80 backdrop-blur-md sticky top-0 z-30">
+        {/* Top row: Title + actions */}
+        <div className="flex items-center justify-between mb-2.5">
+          <div>
+            <h1 className="text-lg font-black leading-tight">کاتالوگ</h1>
+            <p className="text-[11px] text-muted mt-0.5">{toPersianDigits(filtered.length)} خودرو</p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {/* Filter toggle */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`relative h-9 px-3 rounded-xl flex items-center gap-1.5 text-xs font-bold transition-all ${
+                showFilters || activeFilterCount > 0
+                  ? "bg-primary/10 text-primary border border-primary/20"
+                  : "bg-background text-muted border border-border"
+              }`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+              </svg>
+              فیلتر
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1.5 -left-1.5 w-4.5 h-4.5 bg-primary text-white text-[9px] font-black rounded-full flex items-center justify-center">
+                  {toPersianDigits(activeFilterCount)}
+                </span>
+              )}
+            </button>
+            {/* View toggle */}
+            <div className="flex bg-background rounded-xl border border-border p-0.5">
+              <button onClick={() => setView("list")} className={`p-2 rounded-lg transition-colors ${viewMode === "list" ? "bg-surface shadow-sm text-foreground" : "text-muted"}`}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
               </button>
-              <button onClick={() => setView("grid")} className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-surface shadow-sm text-foreground" : "text-muted"}`}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
+              <button onClick={() => setView("grid")} className={`p-2 rounded-lg transition-colors ${viewMode === "grid" ? "bg-surface shadow-sm text-foreground" : "text-muted"}`}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
               </button>
             </div>
           </div>
         </div>
 
         {/* Search */}
-        <div className="relative mb-2">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted">
+        <div className="relative">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted">
             <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
           </svg>
           <input
             type="text"
-            placeholder="جستجو نام یا برند..."
+            placeholder="جستجوی نام یا برند..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-background border border-border rounded-xl pr-9 pl-8 py-1.5 text-sm outline-none focus:border-primary transition-colors"
+            className="w-full bg-background border border-border rounded-xl pr-10 pl-9 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
           />
           {search && (
-            <button onClick={() => setSearch("")} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted hover:text-foreground">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            <button onClick={() => setSearch("")} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted hover:text-foreground transition-colors">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
             </button>
           )}
         </div>
 
-        {/* Filter Row 1: Origins */}
-        <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1">
-          {ORIGINS.map((o) => (
-            <button
-              key={o.key}
-              onClick={() => setOriginFilter(o.key)}
-              className={`shrink-0 text-[10px] px-2.5 py-1 rounded-full font-bold transition-colors ${
-                originFilter === o.key ? "bg-primary text-white" : "bg-background text-muted"
-              }`}
-            >
-              {o.label}
-            </button>
-          ))}
-          {activeFilterCount > 0 && (
-            <button
-              onClick={() => { setOriginFilter("all"); setCategoryFilter("all"); setConditionFilter("all"); }}
-              className="shrink-0 text-[9px] text-danger font-bold px-2 py-1"
-            >
-              پاک کردن
-            </button>
-          )}
-        </div>
-
-        {/* Filter Row 2: Category + Condition + Sort */}
-        <div className="flex gap-1 overflow-x-auto no-scrollbar pb-0.5">
-          {CATEGORIES.filter(c => c.key !== "all").map((c) => (
-            <button
-              key={c.key}
-              onClick={() => setCategoryFilter(prev => prev === c.key ? "all" : c.key)}
-              className={`shrink-0 text-[10px] px-2.5 py-1 rounded-full font-bold transition-colors ${
-                categoryFilter === c.key ? "bg-accent text-white" : "bg-background text-muted"
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
-          <div className="w-px bg-border shrink-0 mx-0.5 my-1" />
-          {[
-            { key: "new", label: "صفر" },
-            { key: "used", label: "کارکرده" },
-          ].map((cond) => (
-            <button
-              key={cond.key}
-              onClick={() => setConditionFilter(prev => prev === cond.key ? "all" : cond.key)}
-              className={`shrink-0 text-[10px] px-2.5 py-1 rounded-full font-bold transition-colors ${
-                conditionFilter === cond.key ? "bg-emerald-600 text-white" : "bg-background text-muted"
-              }`}
-            >
-              {cond.label}
-            </button>
-          ))}
-          <div className="w-px bg-border shrink-0 mx-0.5 my-1" />
+        {/* Sort row — always visible */}
+        <div className="flex gap-1.5 mt-2.5 overflow-x-auto no-scrollbar">
           {SORT_OPTIONS.map((s) => (
             <button
               key={s.key}
               onClick={() => setSortBy(s.key)}
-              className={`shrink-0 text-[10px] px-2.5 py-1 rounded-full font-bold transition-colors ${
-                sortBy === s.key ? "bg-foreground text-background" : "bg-background text-muted"
+              className={`shrink-0 text-[11px] px-3 py-1.5 rounded-lg font-bold transition-all ${
+                sortBy === s.key
+                  ? "bg-foreground text-background shadow-sm"
+                  : "text-muted hover:text-foreground"
               }`}
             >
               {s.label}
@@ -357,9 +359,164 @@ export default function CatalogPage() {
         </div>
       </div>
 
-      {/* Car List / Grid */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4 pt-1.5">
-        <div className={viewMode === "grid" ? "grid grid-cols-2 gap-2" : "space-y-1.5"}>
+      {/* ─── Filter Panel (collapsible) ─── */}
+      {showFilters && (
+        <div className="px-4 py-3 bg-background border-b border-border space-y-3 animate-in slide-in-from-top-2 duration-200">
+          {/* Origin */}
+          <div>
+            <p className="text-[10px] font-bold text-muted mb-1.5">کشور سازنده</p>
+            <div className="flex flex-wrap gap-1.5">
+              {ORIGINS.map((o) => (
+                <button
+                  key={o.key}
+                  onClick={() => setOriginFilter(o.key)}
+                  className={`text-[11px] px-3 py-1.5 rounded-lg font-bold transition-all ${
+                    originFilter === o.key
+                      ? "bg-primary text-white shadow-sm"
+                      : "bg-surface border border-border text-muted"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Category */}
+          <div>
+            <p className="text-[10px] font-bold text-muted mb-1.5">نوع بدنه</p>
+            <div className="flex flex-wrap gap-1.5">
+              {CATEGORIES.map((c) => (
+                <button
+                  key={c.key}
+                  onClick={() => setCategoryFilter(c.key)}
+                  className={`text-[11px] px-3 py-1.5 rounded-lg font-bold transition-all ${
+                    categoryFilter === c.key
+                      ? "bg-accent text-white shadow-sm"
+                      : "bg-surface border border-border text-muted"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Condition + Transmission row */}
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <p className="text-[10px] font-bold text-muted mb-1.5">وضعیت</p>
+              <div className="flex gap-1.5">
+                {[
+                  { key: "all", label: "همه" },
+                  { key: "new", label: "صفر" },
+                  { key: "used", label: "کارکرده" },
+                ].map((cond) => (
+                  <button
+                    key={cond.key}
+                    onClick={() => setConditionFilter(cond.key)}
+                    className={`text-[11px] px-3 py-1.5 rounded-lg font-bold transition-all ${
+                      conditionFilter === cond.key
+                        ? "bg-emerald-600 text-white shadow-sm"
+                        : "bg-surface border border-border text-muted"
+                    }`}
+                  >
+                    {cond.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1">
+              <p className="text-[10px] font-bold text-muted mb-1.5">گیربکس</p>
+              <div className="flex gap-1.5">
+                {TRANSMISSIONS.map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setTransmissionFilter(t.key)}
+                    className={`text-[11px] px-3 py-1.5 rounded-lg font-bold transition-all ${
+                      transmissionFilter === t.key
+                        ? "bg-violet-600 text-white shadow-sm"
+                        : "bg-surface border border-border text-muted"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Price range */}
+          <div>
+            <p className="text-[10px] font-bold text-muted mb-1.5">محدوده قیمت</p>
+            <div className="flex flex-wrap gap-1.5">
+              {PRICE_PRESETS.map((p, i) => (
+                <button
+                  key={i}
+                  onClick={() => setPricePreset(i)}
+                  className={`text-[11px] px-3 py-1.5 rounded-lg font-bold transition-all ${
+                    pricePreset === i
+                      ? "bg-orange-600 text-white shadow-sm"
+                      : "bg-surface border border-border text-muted"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Clear all */}
+          {activeFilterCount > 0 && (
+            <button
+              onClick={() => { setOriginFilter("all"); setCategoryFilter("all"); setConditionFilter("all"); setTransmissionFilter("all"); setPricePreset(0); }}
+              className="w-full py-2 text-xs font-bold text-danger hover:bg-danger/5 rounded-lg transition-colors"
+            >
+              پاک کردن همه فیلترها
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Active filter chips (when panel is closed) */}
+      {!showFilters && activeFilterCount > 0 && (
+        <div className="px-4 py-2 flex gap-1.5 overflow-x-auto no-scrollbar border-b border-border/50">
+          {originFilter !== "all" && (
+            <button onClick={() => setOriginFilter("all")} className="shrink-0 flex items-center gap-1 text-[10px] font-bold bg-primary/10 text-primary px-2.5 py-1 rounded-full">
+              {getOriginLabel(originFilter)}
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
+          )}
+          {categoryFilter !== "all" && (
+            <button onClick={() => setCategoryFilter("all")} className="shrink-0 flex items-center gap-1 text-[10px] font-bold bg-accent/10 text-accent px-2.5 py-1 rounded-full">
+              {getCategoryLabel(categoryFilter)}
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
+          )}
+          {conditionFilter !== "all" && (
+            <button onClick={() => setConditionFilter("all")} className="shrink-0 flex items-center gap-1 text-[10px] font-bold bg-emerald-600/10 text-emerald-600 px-2.5 py-1 rounded-full">
+              {conditionFilter === "new" ? "صفر" : "کارکرده"}
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
+          )}
+          {transmissionFilter !== "all" && (
+            <button onClick={() => setTransmissionFilter("all")} className="shrink-0 flex items-center gap-1 text-[10px] font-bold bg-violet-600/10 text-violet-600 px-2.5 py-1 rounded-full">
+              {getTransmissionLabel(transmissionFilter)}
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
+          )}
+          {pricePreset !== 0 && (
+            <button onClick={() => setPricePreset(0)} className="shrink-0 flex items-center gap-1 text-[10px] font-bold bg-orange-600/10 text-orange-600 px-2.5 py-1 rounded-full">
+              {PRICE_PRESETS[pricePreset].label}
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ─── Car List / Grid ─── */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4 pt-3">
+        <div className={viewMode === "grid" ? "grid grid-cols-2 gap-2.5" : "space-y-2"}>
           {filtered.map((car) => {
             const satisfaction = car.intel?.ownerSatisfaction;
             const originColor = ORIGIN_COLORS[car.origin] || "bg-muted/10 text-muted";
@@ -370,48 +527,32 @@ export default function CatalogPage() {
               <div
                 key={car.id}
                 onClick={() => compareMode ? toggleCompare(car.id) : openCarDetail(car.id)}
-                className={`relative bg-surface rounded-xl border overflow-hidden active:scale-[0.98] transition-all cursor-pointer ${
+                className={`relative bg-surface rounded-2xl border overflow-hidden active:scale-[0.97] transition-all cursor-pointer ${
                   compareMode && isInCompare(car.id) ? "border-primary ring-2 ring-primary/20" : "border-border"
                 }`}
               >
                 {compareMode && (
-                  <div className={`absolute top-2 left-2 z-10 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                  <div className={`absolute top-2.5 left-2.5 z-10 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                     isInCompare(car.id) ? "bg-primary border-primary" : "bg-white/80 dark:bg-black/50 border-border"
                   }`}>
-                    {isInCompare(car.id) && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><path d="M20 6L9 17l-5-5" /></svg>}
+                    {isInCompare(car.id) && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><path d="M20 6L9 17l-5-5" /></svg>}
                   </div>
                 )}
 
-                {/* Top: origin + fav */}
-                <div className="flex items-center justify-between px-2.5 pt-2">
-                  <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${originColor}`}>
-                    {getOriginLabel(car.origin)}
-                  </span>
-                  <button onClick={(e) => toggleFavorite(car.id, e)} className="p-0.5">
-                    <svg width="13" height="13" viewBox="0 0 24 24"
-                      fill={favoriteIds.has(car.id) ? "currentColor" : "none"}
-                      stroke="currentColor" strokeWidth="2"
-                      className={favoriteIds.has(car.id) ? "text-danger" : "text-muted/30"}
-                    >
-                      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7z" />
-                    </svg>
-                  </button>
-                </div>
-
-                {/* Satisfaction */}
-                <div className="flex justify-center py-1.5">
+                {/* Satisfaction circle */}
+                <div className="flex justify-center pt-4 pb-2">
                   {satisfaction ? (
-                    <div className={`w-10 h-10 rounded-full flex flex-col items-center justify-center ${
-                      satisfaction >= 7 ? "bg-accent/10" : satisfaction >= 5 ? "bg-primary/10" : "bg-background"
+                    <div className={`w-12 h-12 rounded-full flex flex-col items-center justify-center border-2 ${
+                      satisfaction >= 7 ? "border-accent/30 bg-accent/5" : satisfaction >= 5 ? "border-primary/30 bg-primary/5" : "border-border bg-background"
                     }`}>
-                      <span className={`text-sm font-black leading-none ${
+                      <span className={`text-base font-black leading-none ${
                         satisfaction >= 7 ? "text-accent" : satisfaction >= 5 ? "text-primary" : "text-muted"
                       }`}>{toPersianDigits(satisfaction)}</span>
-                      <span className="text-[7px] text-muted">رضایت</span>
+                      <span className="text-[7px] text-muted mt-0.5">از ۱۰</span>
                     </div>
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted/20">
+                    <div className="w-12 h-12 rounded-full bg-background border border-border flex items-center justify-center">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted/30">
                         <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
                         <path d="M5 17H3v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2" /><path d="M9 17h6" />
                       </svg>
@@ -420,95 +561,104 @@ export default function CatalogPage() {
                 </div>
 
                 {/* Info */}
-                <div className="px-2.5 pb-2.5 text-center">
-                  <div className="flex items-center justify-center gap-1">
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${car.isNew ? "bg-emerald-500" : "bg-orange-400"}`} />
-                    <h3 className="text-[11px] font-black truncate">{car.nameFa}</h3>
+                <div className="px-3 pb-3 text-center">
+                  <h3 className="text-xs font-black truncate">{car.nameFa}</h3>
+                  <p className="text-[10px] text-muted mt-0.5">{car.brandFa}</p>
+                  <div className="flex items-center justify-center gap-1.5 mt-1.5">
+                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md ${originColor}`}>
+                      {getOriginLabel(car.origin)}
+                    </span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${car.isNew ? "bg-emerald-500" : "bg-orange-400"}`} />
                   </div>
-                  <p className="text-[9px] text-muted">{car.brandFa}</p>
-                  <p className={`text-[10px] font-bold mt-0.5 ${hasValidPrice ? "text-primary" : "text-muted"}`}>
+                  <p className={`text-[11px] font-bold mt-2 ${hasValidPrice ? "text-primary" : "text-muted"}`}>
                     {formatPriceRange(car.priceMin, car.priceMax)}
                   </p>
-                  {getTopTraits(car).length > 0 && (
-                    <div className="flex justify-center gap-1 mt-1">
-                      {getTopTraits(car).slice(0, 2).map((trait) => (
-                        <span key={trait} className="text-[8px] font-bold bg-accent/8 text-accent px-1.5 py-0.5 rounded-full">{trait}</span>
-                      ))}
-                    </div>
-                  )}
                 </div>
+
+                {/* Favorite */}
+                <button onClick={(e) => toggleFavorite(car.id, e)} className="absolute top-2.5 right-2.5 p-1">
+                  <svg width="14" height="14" viewBox="0 0 24 24"
+                    fill={favoriteIds.has(car.id) ? "currentColor" : "none"}
+                    stroke="currentColor" strokeWidth="2"
+                    className={favoriteIds.has(car.id) ? "text-danger" : "text-muted/30"}
+                  >
+                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7z" />
+                  </svg>
+                </button>
               </div>
             ) : (
-              /* ── List Card (compact) ── */
+              /* ── List Card ── */
               <div
                 key={car.id}
                 onClick={() => compareMode ? toggleCompare(car.id) : openCarDetail(car.id)}
-                className={`bg-surface rounded-xl border overflow-hidden active:scale-[0.99] transition-all cursor-pointer ${
+                className={`bg-surface rounded-2xl border overflow-hidden active:scale-[0.98] transition-all cursor-pointer ${
                   compareMode && isInCompare(car.id) ? "border-primary ring-2 ring-primary/20" : "border-border"
                 }`}
               >
-                <div className="flex items-center gap-2.5 px-3 py-2 relative">
+                <div className="flex items-center gap-3 px-3.5 py-3 relative">
                   {compareMode && (
-                    <div className={`absolute top-2 left-2 z-10 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    <div className={`absolute top-3 left-3 z-10 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                       isInCompare(car.id) ? "bg-primary border-primary" : "bg-white/80 dark:bg-black/50 border-border"
                     }`}>
                       {isInCompare(car.id) && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><path d="M20 6L9 17l-5-5" /></svg>}
                     </div>
                   )}
 
-                  {/* Car info — main area */}
+                  {/* Satisfaction indicator */}
+                  <div className="shrink-0">
+                    {satisfaction ? (
+                      <div className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center ${
+                        satisfaction >= 7 ? "bg-accent/10" : satisfaction >= 5 ? "bg-primary/10" : "bg-background"
+                      }`}>
+                        <span className={`text-sm font-black leading-none ${
+                          satisfaction >= 7 ? "text-accent" : satisfaction >= 5 ? "text-primary" : "text-muted"
+                        }`}>{toPersianDigits(satisfaction)}</span>
+                        <span className="text-[7px] text-muted">رضایت</span>
+                      </div>
+                    ) : (
+                      <div className="w-11 h-11 rounded-xl bg-background flex items-center justify-center">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted/20">
+                          <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                          <path d="M5 17H3v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2" /><path d="M9 17h6" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Car info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
+                      <h3 className="text-sm font-black truncate">{car.nameFa}</h3>
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${car.isNew ? "bg-emerald-500" : "bg-orange-400"}`} />
-                      <h3 className="text-[13px] font-black truncate">{car.nameFa}</h3>
-                      <span className="text-[9px] text-muted">{car.brandFa}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${originColor}`}>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${originColor}`}>
                         {getOriginLabel(car.origin)}
                       </span>
-                      <span className="text-[8px] bg-background text-muted px-1.5 py-0.5 rounded-full">
+                      <span className="text-[9px] text-muted">
                         {getCategoryLabel(car.category)}
                       </span>
-                      {car.specs?.horsepower && (
-                        <span className="text-[8px] text-muted flex items-center gap-0.5">
-                          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-muted/40"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
-                          {toPersianDigits(car.specs.horsepower)}
-                        </span>
-                      )}
                       {car.specs?.transmission && (
-                        <span className="text-[8px] text-muted">{car.specs.transmission === "automatic" ? "AT" : car.specs.transmission === "manual" ? "MT" : ""}</span>
+                        <span className="text-[9px] text-muted/60">{car.specs.transmission === "automatic" ? "اتوماتیک" : car.specs.transmission === "manual" ? "دنده‌ای" : car.specs.transmission}</span>
                       )}
-                      {getTopTraits(car).slice(0, 2).map((trait) => (
-                        <span key={trait} className="text-[7px] font-bold bg-accent/8 text-accent px-1 py-0.5 rounded-full">{trait}</span>
-                      ))}
                     </div>
                   </div>
 
-                  {/* Price + satisfaction — right side */}
-                  <div className="shrink-0 text-left flex flex-col items-end gap-0.5">
-                    <span className={`text-[11px] font-bold ${hasValidPrice ? "text-primary" : "text-muted/40"}`}>
+                  {/* Price + Favorite */}
+                  <div className="shrink-0 flex flex-col items-end gap-1">
+                    <span className={`text-xs font-black ${hasValidPrice ? "text-primary" : "text-muted/40"}`}>
                       {hasValidPrice ? formatPriceRange(car.priceMin, car.priceMax) : "—"}
                     </span>
-                    {satisfaction ? (
-                      <span className={`text-[9px] font-black ${
-                        satisfaction >= 7 ? "text-accent" : satisfaction >= 5 ? "text-primary" : "text-muted"
-                      }`}>
-                        رضایت {toPersianDigits(satisfaction)}
-                      </span>
-                    ) : null}
+                    <button onClick={(e) => toggleFavorite(car.id, e)} className="p-0.5">
+                      <svg width="15" height="15" viewBox="0 0 24 24"
+                        fill={favoriteIds.has(car.id) ? "currentColor" : "none"}
+                        stroke="currentColor" strokeWidth="2"
+                        className={favoriteIds.has(car.id) ? "text-danger" : "text-muted/20"}
+                      >
+                        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7z" />
+                      </svg>
+                    </button>
                   </div>
-
-                  {/* Favorite */}
-                  <button onClick={(e) => toggleFavorite(car.id, e)} className="shrink-0 p-0.5">
-                    <svg width="14" height="14" viewBox="0 0 24 24"
-                      fill={favoriteIds.has(car.id) ? "currentColor" : "none"}
-                      stroke="currentColor" strokeWidth="2"
-                      className={favoriteIds.has(car.id) ? "text-danger" : "text-muted/20"}
-                    >
-                      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7z" />
-                    </svg>
-                  </button>
                 </div>
               </div>
             );
@@ -516,17 +666,27 @@ export default function CatalogPage() {
         </div>
 
         {filtered.length === 0 && (
-          <div className="text-center py-16">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="mx-auto text-muted/20 mb-3">
-              <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /><path d="M8 11h6" />
-            </svg>
+          <div className="text-center py-20">
+            <div className="w-16 h-16 mx-auto mb-4 bg-background rounded-2xl flex items-center justify-center">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted/30">
+                <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /><path d="M8 11h6" />
+              </svg>
+            </div>
             <p className="text-sm font-bold text-muted mb-1">خودرویی پیدا نشد</p>
-            <p className="text-[11px] text-muted/60">فیلترها را تغییر دهید</p>
+            <p className="text-xs text-muted/60">فیلترها رو تغییر بده یا عبارت دیگه‌ای جستجو کن</p>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={() => { setOriginFilter("all"); setCategoryFilter("all"); setConditionFilter("all"); setTransmissionFilter("all"); setPricePreset(0); setSearch(""); }}
+                className="mt-3 px-5 py-2 bg-primary/10 text-primary text-xs font-bold rounded-xl"
+              >
+                پاک کردن فیلترها
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      {/* Floating Compare Button */}
+      {/* ─── Floating Compare Button ─── */}
       <div className="sticky bottom-14 px-5 pb-2 pt-1 z-20">
         <div className="max-w-md mx-auto">
           {compareMode ? (
@@ -555,7 +715,7 @@ export default function CatalogPage() {
           ) : (
             <button
               onClick={() => setCompareMode(true)}
-              className="w-full py-2.5 bg-surface border border-border rounded-xl text-xs font-bold text-muted flex items-center justify-center gap-2 hover:text-foreground transition-colors"
+              className="w-full py-2.5 bg-surface/90 backdrop-blur-sm border border-border rounded-xl text-xs font-bold text-muted flex items-center justify-center gap-2 hover:text-foreground transition-colors shadow-sm"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4" />
