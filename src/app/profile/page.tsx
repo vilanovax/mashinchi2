@@ -910,6 +910,33 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Preferences Section */}
+        <div className="px-5 mb-4">
+          <h2 className="text-sm font-black mb-2 flex items-center gap-1.5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted">
+              <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+            </svg>
+            سلیقه و فیلترها
+          </h2>
+          <button
+            onClick={() => router.push(`/preferences?budget=${profile?.budget || "2500000000"}`)}
+            className="w-full bg-surface rounded-2xl border border-border p-4 flex items-center gap-3 hover:bg-background transition-colors"
+          >
+            <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
+                <path d="M3 6h18M7 12h10M11 18h2" />
+              </svg>
+            </div>
+            <div className="text-right flex-1">
+              <div className="text-xs font-bold">تنظیم نوع بدنه، کشور و برند</div>
+              <div className="text-[10px] text-muted mt-0.5">مشخص کن چی رو می‌خوای و چی رو نمی‌خوای</div>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted shrink-0 rotate-180">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+        </div>
+
         {/* Settings Section */}
         <div className="px-5 mb-6">
           <h2 className="text-sm font-black mb-2 flex items-center gap-1.5">

@@ -50,9 +50,20 @@ export async function GET() {
       }
     : {};
 
+  // Apply user's hard preferences (categories, origins, brands)
+  const preferredCategories = user.preferredCategories || [];
+  const excludedOrigins = user.excludedOrigins || [];
+  const excludedBrands = user.excludedBrands || [];
+
+  const prefsWhere = {
+    ...(preferredCategories.length > 0 ? { category: { in: preferredCategories } } : {}),
+    ...(excludedOrigins.length > 0 ? { origin: { notIn: excludedOrigins } } : {}),
+    ...(excludedBrands.length > 0 ? { brandFa: { notIn: excludedBrands } } : {}),
+  };
+
   // Get only budget-matched cars with needed fields
   const allCars = await prisma.car.findMany({
-    where: budgetWhere,
+    where: { ...budgetWhere, ...prefsWhere },
     include: {
       scores: true,
       specs: true,

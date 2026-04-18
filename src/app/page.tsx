@@ -56,7 +56,7 @@ export default function HomePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ budget: budget.toString() }),
       });
-      router.push(`/explore?budget=${budget}`);
+      router.push(`/preferences?budget=${budget}`);
     } catch {
       setLoading(false);
     }

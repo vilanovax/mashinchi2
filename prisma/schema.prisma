@@ -157,6 +157,11 @@ model User {
   phone        String?  @unique // mobile number for auth
   passwordHash String?  // hashed 6-digit password
   budget       BigInt?  // user's budget in Toman
+
+  // Hard preferences (optional filters applied globally)
+  preferredCategories String[] @default([]) // if non-empty, only show these body types
+  excludedOrigins     String[] @default([]) // never show cars from these countries
+  excludedBrands      String[] @default([]) // never show these brands (by nameFa/brandFa)
   interactions UserInteraction[]
   tasteProfile UserTasteProfile?
   createdAt    DateTime @default(now())
