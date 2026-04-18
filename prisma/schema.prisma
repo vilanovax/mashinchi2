@@ -154,6 +154,8 @@ model PriceHistory {
 model User {
   id           String   @id @default(cuid())
   sessionId    String   @unique // cookie-based session
+  phone        String?  @unique // mobile number for auth
+  passwordHash String?  // hashed 6-digit password
   budget       BigInt?  // user's budget in Toman
   interactions UserInteraction[]
   tasteProfile UserTasteProfile?

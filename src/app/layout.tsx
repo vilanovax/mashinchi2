@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ThemeProvider from "@/components/ThemeProvider";
+import AuthProvider from "@/components/AuthProvider";
 import BottomNav from "@/components/BottomNav";
 import PWAPrompt from "@/components/PWAPrompt";
 
@@ -81,9 +82,11 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
-          {children}
-          <BottomNav />
-          <PWAPrompt />
+          <AuthProvider>
+            {children}
+            <BottomNav />
+            <PWAPrompt />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { formatPrice, toPersianDigits, getOriginLabel, getCategoryLabel } from "@/lib/utils";
 import { useTheme } from "@/components/ThemeProvider";
+import { useAuth } from "@/components/AuthProvider";
+import AuthModal from "@/components/AuthModal";
 import BottomSheet from "@/components/BottomSheet";
 import { useCompare } from "@/lib/useCompare";
 import { getHistory, removeSnapshot, type HistoryEntry } from "@/lib/recommendHistory";
@@ -85,6 +87,10 @@ export default function ProfilePage() {
   const [myCarSaving, setMyCarSaving] = useState(false);
   const [myCarSaved, setMyCarSaved] = useState(false);
   const [allCars, setAllCars] = useState<{ id: string; nameFa: string; brandFa: string }[]>([]);
+
+  // Auth
+  const { authenticated, phone, logout } = useAuth();
+  const [showAuth, setShowAuth] = useState(false);
 
   // Recommend history
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -216,12 +222,18 @@ export default function ProfilePage() {
                     {profile.userTypes.length > 0 ? (
                       <>
                         <div className="text-base font-black">خریدار {profile.userTypes[0]}</div>
-                        <div className="text-[11px] text-muted mt-0.5">بر اساس {toPersianDigits(profile.totalInteractions)} بررسی</div>
+                        <div className="text-[11px] text-muted mt-0.5">
+                          {authenticated && phone
+                            ? toPersianDigits(phone)
+                            : `بر اساس ${toPersianDigits(profile.totalInteractions)} بررسی`}
+                        </div>
                       </>
                     ) : (
                       <>
                         <div className="text-base font-black">پروفایل شما</div>
-                        <div className="text-[11px] text-muted mt-0.5">سلیقه‌سنجی فعال</div>
+                        <div className="text-[11px] text-muted mt-0.5">
+                          {authenticated && phone ? toPersianDigits(phone) : "سلیقه‌سنجی فعال"}
+                        </div>
                       </>
                     )}
                   </div>
@@ -841,6 +853,63 @@ export default function ProfilePage() {
           )}
         </div>
 
+        {/* Account Section */}
+        <div className="px-5 mb-4">
+          <h2 className="text-sm font-black mb-2 flex items-center gap-1.5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            حساب کاربری
+          </h2>
+          <div className="bg-surface rounded-2xl border border-border overflow-hidden">
+            {authenticated ? (
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold">{phone ? toPersianDigits(phone) : ""}</div>
+                      <div className="text-[10px] text-accent">وارد شده</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      await logout();
+                      window.location.reload();
+                    }}
+                    className="text-[11px] text-danger font-bold px-3 py-1.5 rounded-lg hover:bg-danger/5 transition-colors"
+                  >
+                    خروج
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAuth(true)}
+                className="w-full p-4 flex items-center gap-3 hover:bg-background transition-colors"
+              >
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
+                    <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3" />
+                  </svg>
+                </div>
+                <div className="text-right flex-1">
+                  <div className="text-xs font-bold">ورود / ثبت‌نام</div>
+                  <div className="text-[10px] text-muted mt-0.5">ذخیره علاقه‌مندی‌ها و سلیقه روی همه دستگاه‌ها</div>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted shrink-0 rotate-180">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Settings Section */}
         <div className="px-5 mb-6">
           <h2 className="text-sm font-black mb-2 flex items-center gap-1.5">
@@ -969,6 +1038,9 @@ export default function ProfilePage() {
           </div>
         ) : null}
       </BottomSheet>
+
+      {/* Auth Modal */}
+      <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} />
     </div>
   );
 }
