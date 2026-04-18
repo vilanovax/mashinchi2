@@ -72,6 +72,38 @@ interface CarDetail extends Car {
 const ROUND_SIZE = 6;
 const MIN_INTERACTIONS = 6;
 
+// Greedy diversity sampling: picks cards to maximize spread across origin & category,
+// so each round gives richer taste signals than pure random.
+function selectDiverseCards<T extends { origin: string; category: string }>(
+  pool: T[],
+  count: number
+): T[] {
+  if (pool.length <= count) return pool;
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  const selected: T[] = [];
+  const originCounts: Record<string, number> = {};
+  const categoryCounts: Record<string, number> = {};
+
+  while (selected.length < count && shuffled.length > 0) {
+    let bestIdx = 0;
+    let bestScore = Infinity;
+    for (let i = 0; i < shuffled.length; i++) {
+      const car = shuffled[i];
+      const score = (originCounts[car.origin] || 0) * 2 + (categoryCounts[car.category] || 0);
+      if (score < bestScore) {
+        bestScore = score;
+        bestIdx = i;
+      }
+    }
+    const picked = shuffled.splice(bestIdx, 1)[0];
+    selected.push(picked);
+    originCounts[picked.origin] = (originCounts[picked.origin] || 0) + 1;
+    categoryCounts[picked.category] = (categoryCounts[picked.category] || 0) + 1;
+  }
+
+  return selected;
+}
+
 function ExploreContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -123,10 +155,10 @@ function ExploreContent() {
     const res = await fetch(
       `/api/cars?budgetMin=${minBudget}&budgetMax=${maxBudget}${excludeParam}`
     );
-    const data = await res.json();
+    const data: Car[] = await res.json();
 
-    const shuffled = data.sort(() => Math.random() - 0.5).slice(0, ROUND_SIZE);
-    setCars(shuffled);
+    const diverse = selectDiverseCards(data, ROUND_SIZE);
+    setCars(diverse);
     setCurrentIndex(0);
     setLoading(false);
   }, [budget, interactedIds]);
