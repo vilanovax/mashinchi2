@@ -94,6 +94,7 @@ export default function ProfilePage() {
 
   // Recommend history
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [showAllHistory, setShowAllHistory] = useState(false);
 
   useEffect(() => {
     setHistory(getHistory());
@@ -210,32 +211,39 @@ export default function ProfilePage() {
             <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-accent/8 rounded-2xl p-4 relative overflow-hidden">
 
               <div className="relative">
-                {/* Avatar + Main Type */}
+                {/* Avatar + Identity */}
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-14 h-14 rounded-full bg-primary/15 border-2 border-primary/30 flex items-center justify-center">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
+                  <div className={`w-14 h-14 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                    authenticated
+                      ? "bg-primary/15 border-primary/30 text-primary"
+                      : "bg-muted/10 border-muted/20 text-muted"
+                  }`}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
                       <circle cx="12" cy="7" r="4" />
                     </svg>
                   </div>
-                  <div>
-                    {profile.userTypes.length > 0 ? (
-                      <>
-                        <div className="text-base font-black">خریدار {profile.userTypes[0]}</div>
-                        <div className="text-[11px] text-muted mt-0.5">
-                          {authenticated && phone
-                            ? toPersianDigits(phone)
-                            : `بر اساس ${toPersianDigits(profile.totalInteractions)} بررسی`}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="text-base font-black">پروفایل شما</div>
-                        <div className="text-[11px] text-muted mt-0.5">
-                          {authenticated && phone ? toPersianDigits(phone) : "سلیقه‌سنجی فعال"}
-                        </div>
-                      </>
-                    )}
+                  <div className="min-w-0 flex-1">
+                    {/* Line 1: Name / phone / guest */}
+                    <div className="flex items-center gap-1.5">
+                      <div className="text-base font-black truncate">
+                        {authenticated && phone ? toPersianDigits(phone) : "کاربر میهمان"}
+                      </div>
+                      {!authenticated && (
+                        <button
+                          onClick={() => setShowAuth(true)}
+                          className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full hover:bg-primary/15 transition-colors shrink-0"
+                        >
+                          ثبت‌نام
+                        </button>
+                      )}
+                    </div>
+                    {/* Line 2: User type / interaction count */}
+                    <div className="text-[11px] text-muted mt-0.5 truncate">
+                      {profile.userTypes.length > 0
+                        ? <>خریدار {profile.userTypes[0]} <span className="text-muted/60">• {toPersianDigits(profile.totalInteractions)} بررسی</span></>
+                        : "سلیقه‌سنجی فعال"}
+                    </div>
                   </div>
                 </div>
 
@@ -322,23 +330,51 @@ export default function ProfilePage() {
             ) : null}
           </div>
         ) : (
-          /* No Profile State */
-          <div className="px-5 pt-5 pb-3">
-            <div className="bg-surface rounded-2xl border border-border p-6 text-center">
-              <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-primary/15 to-accent/10 rounded-full flex items-center justify-center">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-primary">
-                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
+          /* No Profile State — Guest with no interactions */
+          <div className="px-5 pt-4 pb-2">
+            <div className="bg-linear-to-br from-primary/10 via-primary/5 to-accent/8 rounded-2xl p-4">
+              {/* Guest header */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-14 h-14 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                  authenticated
+                    ? "bg-primary/15 border-primary/30 text-primary"
+                    : "bg-muted/10 border-muted/20 text-muted"
+                }`}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <div className="text-base font-black truncate">
+                      {authenticated && phone ? toPersianDigits(phone) : "کاربر میهمان"}
+                    </div>
+                    {!authenticated && (
+                      <button
+                        onClick={() => setShowAuth(true)}
+                        className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full hover:bg-primary/15 transition-colors shrink-0"
+                      >
+                        ثبت‌نام
+                      </button>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-muted mt-0.5">هنوز سلیقه‌سنجی نکردی</div>
+                </div>
               </div>
-              <p className="text-sm font-black mb-1">هنوز سلیقه‌سنجی نکردی</p>
-              <p className="text-[11px] text-muted mb-4 leading-5">بودجه رو مشخص کن، ماشین‌ها رو بررسی کن<br/>و پروفایل خریدارت ساخته بشه</p>
-              <button
-                onClick={() => router.push("/")}
-                className="px-8 py-2.5 bg-primary text-white text-sm font-bold rounded-xl shadow-lg shadow-primary/20 active:scale-[0.97] transition-transform"
-              >
-                شروع سلیقه‌سنجی
-              </button>
+
+              {/* CTA */}
+              <div className="bg-white/60 dark:bg-white/10 backdrop-blur-sm rounded-xl p-3 text-center">
+                <p className="text-[11px] text-muted mb-3 leading-5">
+                  بودجه رو مشخص کن، ماشین‌ها رو بررسی کن<br/>و پروفایل خریدارت ساخته بشه
+                </p>
+                <button
+                  onClick={() => router.push("/")}
+                  className="w-full py-2.5 bg-primary text-white text-sm font-bold rounded-xl shadow-lg shadow-primary/20 active:scale-[0.97] transition-transform"
+                >
+                  شروع سلیقه‌سنجی
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -588,52 +624,116 @@ export default function ProfilePage() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
                   <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
                 </svg>
-                پیشنهادهای قبلی ({toPersianDigits(history.length)})
+                پیشنهادهای قبلی
+                <span className="text-[10px] text-muted font-normal">({toPersianDigits(history.length)})</span>
               </h2>
+              {history.length > 1 && (
+                <button
+                  onClick={() => setShowAllHistory(!showAllHistory)}
+                  className="text-[10px] font-bold text-primary hover:text-primary/80 transition-colors"
+                >
+                  {showAllHistory ? "بستن" : "نمایش همه"}
+                </button>
+              )}
             </div>
-            <div className="space-y-1.5">
-              {history.map((h) => (
-                <div key={h.id} className="bg-surface rounded-xl border border-border overflow-hidden">
-                  <div className="flex items-center justify-between px-3 py-2 border-b border-border/40">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold">{relativeTime(h.date)}</span>
-                      {h.budget && (
-                        <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">
-                          بودجه {formatBillion(h.budget)}
-                        </span>
-                      )}
-                      <span className="text-[9px] text-muted">{toPersianDigits(h.cars.length)} پیشنهاد</span>
-                    </div>
-                    <button
-                      onClick={() => handleRemoveHistory(h.id)}
-                      className="text-muted/40 hover:text-red-500 p-0.5"
-                      title="حذف"
-                    >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
-                    </button>
-                  </div>
-                  <div className="px-3 py-2">
-                    <div className="flex flex-wrap gap-1.5">
-                      {h.cars.slice(0, 5).map((car, i) => (
-                        <button
-                          key={car.id}
-                          onClick={() => router.push(`/car/${car.id}`)}
-                          className="flex items-center gap-1 bg-background hover:bg-primary/5 rounded-lg px-2 py-1 text-[10px] transition-colors"
-                        >
-                          <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black shrink-0 ${
-                            i === 0 ? "bg-primary text-white" : "bg-border text-muted"
-                          }`}>
-                            {toPersianDigits(i + 1)}
-                          </span>
-                          <span className="font-bold">{car.nameFa}</span>
-                          <span className="text-primary font-bold">· {formatBillion(car.priceMin)}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+
+            {/* Latest snapshot — always expanded */}
+            <div className="bg-surface rounded-xl border border-border overflow-hidden mb-1.5">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border/40">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold">{relativeTime(history[0].date)}</span>
+                  {history[0].budget && (
+                    <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">
+                      {formatBillion(history[0].budget)}
+                    </span>
+                  )}
                 </div>
-              ))}
+                <button
+                  onClick={() => handleRemoveHistory(history[0].id)}
+                  className="text-muted/40 hover:text-red-500 p-0.5"
+                  title="حذف"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <div className="px-3 py-2">
+                <div className="flex flex-wrap gap-1">
+                  {history[0].cars.slice(0, 5).map((car, i) => (
+                    <button
+                      key={car.id}
+                      onClick={() => router.push(`/car/${car.id}`)}
+                      className="flex items-center gap-1 bg-background hover:bg-primary/5 rounded-lg px-2 py-1 text-[10px] transition-colors"
+                    >
+                      <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black shrink-0 ${
+                        i === 0 ? "bg-primary text-white" : "bg-border text-muted"
+                      }`}>
+                        {toPersianDigits(i + 1)}
+                      </span>
+                      <span className="font-bold">{car.nameFa}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+
+            {/* Older snapshots — collapsed rows unless expanded */}
+            {history.length > 1 && (
+              <>
+                {!showAllHistory ? (
+                  <button
+                    onClick={() => setShowAllHistory(true)}
+                    className="w-full bg-surface/60 hover:bg-surface border border-dashed border-border rounded-xl px-3 py-2 flex items-center justify-between text-[10px] text-muted transition-colors"
+                  >
+                    <span>{toPersianDigits(history.length - 1)} پیشنهاد قدیمی‌تر</span>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </button>
+                ) : (
+                  <div className="space-y-1">
+                    {history.slice(1).map((h) => (
+                      <div key={h.id} className="bg-surface rounded-xl border border-border overflow-hidden">
+                        <div className="flex items-center justify-between px-3 py-2 border-b border-border/40">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold">{relativeTime(h.date)}</span>
+                            {h.budget && (
+                              <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">
+                                {formatBillion(h.budget)}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleRemoveHistory(h.id)}
+                            className="text-muted/40 hover:text-red-500 p-0.5"
+                            title="حذف"
+                          >
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                          </button>
+                        </div>
+                        <div className="px-3 py-2">
+                          <div className="flex flex-wrap gap-1">
+                            {h.cars.slice(0, 5).map((car, i) => (
+                              <button
+                                key={car.id}
+                                onClick={() => router.push(`/car/${car.id}`)}
+                                className="flex items-center gap-1 bg-background hover:bg-primary/5 rounded-lg px-2 py-1 text-[10px] transition-colors"
+                              >
+                                <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black shrink-0 ${
+                                  i === 0 ? "bg-primary text-white" : "bg-border text-muted"
+                                }`}>
+                                  {toPersianDigits(i + 1)}
+                                </span>
+                                <span className="font-bold">{car.nameFa}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 

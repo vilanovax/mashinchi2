@@ -217,9 +217,7 @@ function PreferencesContent() {
         <section>
           <div className="flex items-baseline justify-between mb-3">
             <div>
-              <h2 className="text-sm font-black">
-                کشورهای <span className="text-danger">ناپسند</span>
-              </h2>
+              <h2 className="text-sm font-black">کشورهایی که نمیخوام</h2>
               <p className="text-[10px] text-muted mt-0.5">این کشورها در پیشنهادها نمایش داده نمی‌شن</p>
             </div>
             {excludedOrigins.length > 0 && (
