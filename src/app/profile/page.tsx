@@ -208,126 +208,92 @@ export default function ProfilePage() {
         {/* Profile Header */}
         {profile?.hasProfile ? (
           <div className="px-5 pt-4 pb-2">
-            <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-accent/8 rounded-2xl p-4 relative overflow-hidden">
-
-              <div className="relative">
-                {/* Avatar + Identity */}
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`w-14 h-14 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                    authenticated
-                      ? "bg-primary/15 border-primary/30 text-primary"
-                      : "bg-muted/10 border-muted/20 text-muted"
-                  }`}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                      <circle cx="12" cy="7" r="4" />
-                    </svg>
+            <div className="bg-linear-to-br from-primary/10 via-primary/5 to-accent/8 rounded-2xl p-4 relative overflow-hidden">
+              {/* Avatar + Identity */}
+              <div className="flex items-center gap-3 mb-3">
+                <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                  authenticated
+                    ? "bg-primary/15 border-primary/30 text-primary"
+                    : "bg-muted/10 border-muted/20 text-muted"
+                }`}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <div className="text-base font-black truncate">
+                      {authenticated && phone ? toPersianDigits(phone) : "کاربر میهمان"}
+                    </div>
+                    {!authenticated && (
+                      <button
+                        onClick={() => setShowAuth(true)}
+                        className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full hover:bg-primary/15 transition-colors shrink-0"
+                      >
+                        ثبت‌نام
+                      </button>
+                    )}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    {/* Line 1: Name / phone / guest */}
-                    <div className="flex items-center gap-1.5">
-                      <div className="text-base font-black truncate">
-                        {authenticated && phone ? toPersianDigits(phone) : "کاربر میهمان"}
-                      </div>
-                      {!authenticated && (
-                        <button
-                          onClick={() => setShowAuth(true)}
-                          className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full hover:bg-primary/15 transition-colors shrink-0"
-                        >
-                          ثبت‌نام
-                        </button>
-                      )}
-                    </div>
-                    {/* Line 2: User type / interaction count */}
-                    <div className="text-[11px] text-muted mt-0.5 truncate">
-                      {profile.userTypes.length > 0
-                        ? <>خریدار {profile.userTypes[0]} <span className="text-muted/60">• {toPersianDigits(profile.totalInteractions)} بررسی</span></>
-                        : "سلیقه‌سنجی فعال"}
-                    </div>
+                  <div className="text-[11px] text-muted mt-0.5 truncate">
+                    {profile.userTypes.length > 0 ? `خریدار ${profile.userTypes[0]}` : "سلیقه‌سنجی فعال"}
                   </div>
                 </div>
 
-                {/* User Type Badges with icons */}
-                {profile.userTypes.length > 0 && (
-                  <div className="flex gap-2 mb-4">
-                    {profile.userTypes.map((type) => (
-                      <div key={type} className="flex-1 bg-white/60 dark:bg-white/10 backdrop-blur-sm rounded-xl px-2 py-2 text-center">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-primary mx-auto mb-1">
-                          <path d={typeIcons[type] || "M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"} />
-                        </svg>
-                        <span className="text-[10px] font-bold text-foreground">{type}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Stats Row - with icons */}
-                <div className="flex gap-2">
-                  <div className="flex-1 bg-white/50 dark:bg-white/8 backdrop-blur-sm rounded-xl p-2.5 flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="text-sm font-black">{toPersianDigits(profile.totalInteractions)}</div>
-                      <div className="text-[9px] text-muted">بررسی</div>
-                    </div>
-                  </div>
-                  <div className="flex-1 bg-white/50 dark:bg-white/8 backdrop-blur-sm rounded-xl p-2.5 flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-accent">
-                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="text-sm font-black text-accent">{toPersianDigits(profile.totalLikes)}</div>
-                      <div className="text-[9px] text-muted">پسند</div>
-                    </div>
-                  </div>
-                  <div className="flex-1 bg-white/50 dark:bg-white/8 backdrop-blur-sm rounded-xl p-2.5 flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${favorites.length > 0 ? "bg-danger/10" : "bg-muted/10"}`}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={favorites.length > 0 ? "text-danger" : "text-muted"}>
-                        <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div className={`text-sm font-black ${favorites.length > 0 ? "text-danger" : "text-muted"}`}>{toPersianDigits(favorites.length)}</div>
-                      <div className="text-[9px] text-muted">نشان</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Budget + CTA Bar */}
-            {(profile.budget && profile.budget !== "0") || profile.hasTasteProfile ? (
-              <div className="flex gap-2 mt-2">
+                {/* Budget inline */}
                 {profile.budget && profile.budget !== "0" && (
-                  <div className="flex-1 bg-surface rounded-xl border border-border px-3 py-2.5 flex items-center gap-2">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary shrink-0">
-                      <path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
-                    </svg>
-                    <div>
-                      <div className="text-[10px] text-muted">بودجه</div>
-                      <div className="text-xs font-bold text-primary">{toPersianDigits(formatPrice(profile.budget))}</div>
-                    </div>
+                  <div className="text-left shrink-0">
+                    <div className="text-[9px] text-muted">بودجه</div>
+                    <div className="text-xs font-black text-primary">{toPersianDigits(formatPrice(profile.budget))}</div>
                   </div>
                 )}
-                {profile.hasTasteProfile && (
-                  <button
-                    onClick={() => router.push("/results")}
-                    className="flex-1 bg-primary text-white rounded-xl px-3 py-2.5 flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform max-w-[50%]"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                    <span className="text-xs font-bold">پیشنهادات</span>
-                  </button>
-                )}
               </div>
-            ) : null}
+
+              {/* Compact stats row — no boxes, just numbers inline */}
+              <div className="flex items-center justify-around bg-white/40 dark:bg-white/5 backdrop-blur-sm rounded-xl py-2.5 mb-3">
+                <div className="flex flex-col items-center">
+                  <div className="text-base font-black">{toPersianDigits(profile.totalInteractions)}</div>
+                  <div className="text-[9px] text-muted mt-0.5">بررسی</div>
+                </div>
+                <div className="w-px h-6 bg-border/60" />
+                <div className="flex flex-col items-center">
+                  <div className="text-base font-black text-accent">{toPersianDigits(profile.totalLikes)}</div>
+                  <div className="text-[9px] text-muted mt-0.5">پسند</div>
+                </div>
+                <div className="w-px h-6 bg-border/60" />
+                <div className="flex flex-col items-center">
+                  <div className={`text-base font-black ${favorites.length > 0 ? "text-danger" : "text-muted"}`}>{toPersianDigits(favorites.length)}</div>
+                  <div className="text-[9px] text-muted mt-0.5">نشان</div>
+                </div>
+              </div>
+
+              {/* User Type Badges */}
+              {profile.userTypes.length > 0 && (
+                <div className="flex gap-1.5 mb-3">
+                  {profile.userTypes.map((type) => (
+                    <div key={type} className="flex-1 bg-white/60 dark:bg-white/10 backdrop-blur-sm rounded-lg px-2 py-1.5 flex items-center justify-center gap-1.5">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-primary shrink-0">
+                        <path d={typeIcons[type] || "M12 2L2 7l10 5 10-5-10-5z"} />
+                      </svg>
+                      <span className="text-[10px] font-bold text-foreground">{type}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Primary CTA — see recommendations */}
+              {profile.hasTasteProfile && (
+                <button
+                  onClick={() => router.push("/results")}
+                  className="w-full bg-primary text-white rounded-xl py-2.5 flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform shadow-md shadow-primary/20"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                  <span className="text-xs font-bold">دیدن پیشنهادات هوشمند</span>
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           /* No Profile State — Guest with no interactions */
@@ -953,101 +919,76 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Account Section */}
-        <div className="px-5 mb-4">
-          <h2 className="text-sm font-black mb-2 flex items-center gap-1.5">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted">
-              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-            حساب کاربری
-          </h2>
-          <div className="bg-surface rounded-2xl border border-border overflow-hidden">
-            {authenticated ? (
-              <div className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
-                        <path d="M20 6L9 17l-5-5" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold">{phone ? toPersianDigits(phone) : ""}</div>
-                      <div className="text-[10px] text-accent">وارد شده</div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      await logout();
-                      window.location.reload();
-                    }}
-                    className="text-[11px] text-danger font-bold px-3 py-1.5 rounded-lg hover:bg-danger/5 transition-colors"
-                  >
-                    خروج
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowAuth(true)}
-                className="w-full p-4 flex items-center gap-3 hover:bg-background transition-colors"
-              >
-                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
-                    <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3" />
-                  </svg>
-                </div>
-                <div className="text-right flex-1">
-                  <div className="text-xs font-bold">ورود / ثبت‌نام</div>
-                  <div className="text-[10px] text-muted mt-0.5">ذخیره علاقه‌مندی‌ها و سلیقه روی همه دستگاه‌ها</div>
-                </div>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted shrink-0 rotate-180">
-                  <path d="M15 18l-6-6 6-6" />
-                </svg>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Preferences Section */}
-        <div className="px-5 mb-4">
-          <h2 className="text-sm font-black mb-2 flex items-center gap-1.5">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted">
-              <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
-            </svg>
-            سلیقه و فیلترها
-          </h2>
-          <button
-            onClick={() => router.push(`/preferences?budget=${profile?.budget || "2500000000"}`)}
-            className="w-full bg-surface rounded-2xl border border-border p-4 flex items-center gap-3 hover:bg-background transition-colors"
-          >
-            <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
-                <path d="M3 6h18M7 12h10M11 18h2" />
-              </svg>
-            </div>
-            <div className="text-right flex-1">
-              <div className="text-xs font-bold">تنظیم نوع بدنه، کشور و برند</div>
-              <div className="text-[10px] text-muted mt-0.5">مشخص کن چی رو می‌خوای و چی رو نمی‌خوای</div>
-            </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted shrink-0 rotate-180">
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Settings Section */}
+        {/* ─── Unified Settings Group ─── */}
         <div className="px-5 mb-6">
-          <h2 className="text-sm font-black mb-2 flex items-center gap-1.5">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted">
+          <h2 className="text-sm font-black mb-2 flex items-center gap-1.5 text-muted">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
             </svg>
             تنظیمات
           </h2>
-          <div className="bg-surface rounded-2xl border border-border overflow-hidden">
-            {/* Theme Toggle */}
+
+          <div className="bg-surface rounded-2xl border border-border overflow-hidden divide-y divide-border">
+            {/* — Account — */}
+            {authenticated ? (
+              <div className="p-3.5 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold truncate">{phone ? toPersianDigits(phone) : ""}</div>
+                  <div className="text-[10px] text-accent">وارد شده</div>
+                </div>
+                <button
+                  onClick={async () => { await logout(); window.location.reload(); }}
+                  className="text-[11px] text-danger font-bold px-2.5 py-1 rounded-lg hover:bg-danger/5 transition-colors shrink-0"
+                >
+                  خروج
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAuth(true)}
+                className="w-full p-3.5 flex items-center gap-3 hover:bg-background transition-colors text-right"
+              >
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
+                    <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold">ورود / ثبت‌نام</div>
+                  <div className="text-[10px] text-muted mt-0.5">ذخیره روی همه دستگاه‌ها</div>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted/60 shrink-0 rotate-180">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+            )}
+
+            {/* — Preferences — */}
+            <button
+              onClick={() => router.push(`/preferences?budget=${profile?.budget || "2500000000"}`)}
+              className="w-full p-3.5 flex items-center gap-3 hover:bg-background transition-colors text-right"
+            >
+              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
+                  <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-bold">سلیقه و فیلترها</div>
+                <div className="text-[10px] text-muted mt-0.5">نوع بدنه، کشور و برند</div>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted/60 shrink-0 rotate-180">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+
+            {/* — Theme Toggle — */}
             <div className="p-3">
               <div className="flex gap-1 bg-background rounded-xl p-1">
                 {[
@@ -1071,8 +1012,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div className="border-t border-border" />
-
+            {/* — Reset — */}
             <button
               onClick={handleReset}
               className="w-full px-4 py-3 text-right text-xs hover:bg-background transition-colors flex items-center gap-2 text-danger"
@@ -1083,8 +1023,8 @@ export default function ProfilePage() {
               پاک کردن سلیقه و تاریخچه
             </button>
 
-            <div className="border-t border-border" />
-            <div className="px-4 py-2 text-[10px] text-muted text-center">
+            {/* — Version — */}
+            <div className="px-4 py-2 text-[10px] text-muted/60 text-center">
               ماشینچی نسخه ۰.۱.۰
             </div>
           </div>
