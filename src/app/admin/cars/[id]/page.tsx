@@ -377,26 +377,13 @@ export default function AdminCarEditPage({ params }: { params: Promise<{ id: str
 
           {/* Image + Tags inline */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-surface rounded-2xl border border-border p-4">
-              <label className="text-[10px] text-muted block mb-2">تصویر خودرو</label>
-              <div className="flex items-center gap-2">
-                {car.imageUrl ? (
-                  <img src={car.imageUrl} alt={car.nameFa} className="w-16 h-11 object-cover rounded-lg border border-border" />
-                ) : (
-                  <div className="w-16 h-11 bg-background rounded-lg border border-dashed border-border" />
-                )}
-                <label className="px-3 py-1.5 bg-background border border-border rounded-lg text-[10px] font-bold cursor-pointer hover:bg-border/50">
-                  آپلود
-                  <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0]; if (!file) return;
-                      const formData = new FormData(); formData.append("file", file); formData.append("carId", id);
-                      const res = await fetchAdmin("/api/admin/upload", { method: "POST", body: formData });
-                      if (res.ok) { const data = await res.json(); setCar({ ...car, imageUrl: data.imageUrl } as CarData); showToast("آپلود شد"); }
-                    }} />
-                </label>
-              </div>
-            </div>
+            <ImageUploader
+              carId={id}
+              imageUrl={car.imageUrl}
+              carName={car.nameFa}
+              onChange={(url) => setCar({ ...car, imageUrl: url } as CarData)}
+              showToast={showToast}
+            />
             <div className="bg-surface rounded-2xl border border-border p-4">
               <label className="text-[10px] text-muted block mb-2">تگ‌ها</label>
               <div className="flex flex-wrap gap-1 mb-2">
@@ -528,6 +515,150 @@ export default function AdminCarEditPage({ params }: { params: Promise<{ id: str
       )}
 
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-foreground text-background text-xs font-bold px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
+    </div>
+  );
+}
+
+// ─── Image Uploader ─────────────────────────────────────
+function ImageUploader({
+  carId,
+  imageUrl,
+  carName,
+  onChange,
+  showToast,
+}: {
+  carId: string;
+  imageUrl: string | null;
+  carName: string;
+  onChange: (url: string | null) => void;
+  showToast: (msg: string) => void;
+}) {
+  const { fetchAdmin } = useAdmin();
+  const [uploading, setUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFile = async (file: File) => {
+    setError(null);
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("فقط JPG، PNG، WebP"); return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("حداکثر ۵ مگابایت"); return;
+    }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("carId", carId);
+      const res = await fetchAdmin("/api/admin/upload", { method: "POST", body: formData });
+      if (res.ok) {
+        const data = await res.json();
+        onChange(data.imageUrl);
+        showToast("آپلود شد");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "خطا در آپلود");
+      }
+    } catch {
+      setError("خطا در ارتباط");
+    }
+    setUploading(false);
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("تصویر حذف بشه؟")) return;
+    setUploading(true);
+    try {
+      const res = await fetchAdmin(`/api/admin/upload?carId=${carId}`, { method: "DELETE" });
+      if (res.ok) {
+        onChange(null);
+        showToast("حذف شد");
+      }
+    } catch {
+      setError("خطا در حذف");
+    }
+    setUploading(false);
+  };
+
+  return (
+    <div className="bg-surface rounded-2xl border border-border p-4">
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-[10px] text-muted">تصویر خودرو</label>
+        {imageUrl && !uploading && (
+          <button
+            onClick={handleDelete}
+            className="text-[9px] text-danger font-bold px-2 py-0.5 rounded-md hover:bg-danger/5 transition-colors"
+          >
+            حذف
+          </button>
+        )}
+      </div>
+
+      <label
+        onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+        onDragLeave={() => setDragActive(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragActive(false);
+          const file = e.dataTransfer.files?.[0];
+          if (file) handleFile(file);
+        }}
+        className={`relative flex items-center gap-3 p-2 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
+          dragActive
+            ? "border-primary bg-primary/5"
+            : imageUrl
+              ? "border-border hover:border-primary/40"
+              : "border-border hover:border-primary/40 bg-background/50"
+        }`}
+      >
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageUrl} alt={carName} className="w-20 h-14 object-cover rounded-lg border border-border" />
+        ) : (
+          <div className="w-20 h-14 bg-background rounded-lg flex items-center justify-center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted/40">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <path d="M21 15l-5-5L5 21" />
+            </svg>
+          </div>
+        )}
+
+        <div className="flex-1 min-w-0">
+          {uploading ? (
+            <div className="flex items-center gap-2 text-[11px] text-primary font-bold">
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              در حال آپلود...
+            </div>
+          ) : (
+            <>
+              <div className="text-[11px] font-bold">
+                {imageUrl ? "تعویض تصویر" : "آپلود تصویر"}
+              </div>
+              <div className="text-[9px] text-muted mt-0.5">کشیدن یا کلیک • JPG/PNG/WebP • ۵MB</div>
+            </>
+          )}
+        </div>
+
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          disabled={uploading}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFile(file);
+            e.target.value = ""; // allow re-upload of same file
+          }}
+        />
+      </label>
+
+      {error && (
+        <div className="mt-2 text-[10px] text-danger font-bold bg-danger/5 border border-danger/15 rounded-md px-2 py-1">
+          {error}
+        </div>
+      )}
     </div>
   );
 }
